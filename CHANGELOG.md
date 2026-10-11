@@ -8,4 +8,5 @@ All notable changes to this project are documented here. The format follows
 
 ## [0.1.0]
 
-- First release.
+- Add `is_valid_env_name` to check a string against POSIX environment name rules.
+- Add `sanitize_env_name` to turn any string into a valid environment name.
