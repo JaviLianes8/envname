@@ -4,7 +4,7 @@ import envname
 
 # The public API. Add every exported name here as the library grows; this list is the
 # contract and the test below fails if the module and this list disagree.
-PUBLIC_API: list[str] = []
+PUBLIC_API: list[str] = ["is_valid_env_name", "sanitize_env_name"]
 
 
 def test_all_lists_exactly_the_public_api() -> None:
