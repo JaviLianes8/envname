@@ -63,7 +63,7 @@ def test_every_console_example_prints_what_it_shows(capsys: pytest.CaptureFixtur
     (block,) = _blocks("console")
     commands = 0
     expected: list[str] = []
-    for line in block.splitlines() + ["$"]:
+    for line in [*block.splitlines(), "$"]:
         if not line.startswith("$"):
             expected.append(line)
             continue

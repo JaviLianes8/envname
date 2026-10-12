@@ -2,13 +2,13 @@
 
 Progress:
 - [x] Brainstorm ranked improvements (this file)
-- [ ] Rule sets: `shell`, `portable`, `environ`, with a typed `Rules` literal
-- [ ] `check_env_name` and `InvalidEnvName` with the reason and the offending index
-- [ ] Sanitizer: transliteration, `prefix`, guaranteed valid output, strict input types
-- [ ] Command line: `envname check` and `envname sanitize`
-- [ ] Contracts: real shell and real OS ground truth, typing, README examples, installed wheel e2e
-- [ ] Docs: README, CHANGELOG, docstrings, packaging metadata
-- [ ] Gates: ruff format, ruff check, mypy --strict, pytest
+- [x] Rule sets: `shell`, `portable`, `environ`, with a typed `Rules` literal
+- [x] `check_env_name` and `InvalidEnvName` with the reason and the offending index
+- [x] Sanitizer: transliteration, `prefix`, guaranteed valid output, strict input types
+- [x] Command line: `envname check` and `envname sanitize`
+- [x] Contracts: real shell and real OS ground truth, typing, README examples, installed wheel e2e
+- [x] Docs: README, CHANGELOG, docstrings, packaging metadata
+- [x] Gates: ruff format, ruff check, mypy --strict, pytest
 - [ ] Independent review findings fixed with regression tests
 - [ ] Pull request opened, guard clean
 
@@ -76,7 +76,7 @@ against the sources below turned up these gaps:
 2. **`check_env_name`** returns the name or raises `InvalidEnvName` (a `ValueError`) with
    `name`, `rules`, `reason` and `index` of the first offending character, so callers can
    point at the problem.
-3. **A sanitizer that keeps letters.** NFKD transliteration (`Ünïcødé` becomes `UNICODE`),
+3. **A sanitizer that keeps letters.** NFKD transliteration (`Crème brûlée` becomes `CREME_BRULEE`),
    an optional `prefix` that is validated, and an output that is always a valid shell name
    (and portable when upper-cased). Non-string input raises `TypeError`.
 4. **Ground truth contracts.** Tests compare `shell` with a real `bash --posix`, and
