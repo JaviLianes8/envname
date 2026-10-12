@@ -42,17 +42,19 @@ def _bash_literal(name: str) -> str:
     return "$'" + "".join(f"\\x{byte:02x}" for byte in name.encode()) + "'"
 
 
-def test_shell_rules_match_bash_posix_mode() -> None:
+def test_shell_rules_match_bash() -> None:
     bash = _bash()
     if bash is None:
         pytest.skip("bash is not installed")
     names = _corpus()
+    # One shell for the whole corpus: outside POSIX mode a failed special builtin does
+    # not end the shell, and bash checks identifiers the same way in both modes.
     script = "".join(
-        f"if (unset -v -- {_bash_literal(name)}) 2>/dev/null; then echo 1; else echo 0; fi\n"
+        f"if unset -v -- {_bash_literal(name)} 2>/dev/null; then echo 1; else echo 0; fi\n"
         for name in names
     )
     result = subprocess.run(
-        [bash, "--posix", "-s"],
+        [bash, "-s"],
         input=script.encode(),
         capture_output=True,
         env={**os.environ, "LC_ALL": "C"},
