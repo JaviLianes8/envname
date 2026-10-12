@@ -23,6 +23,7 @@ is_valid_env_name("PATH", rules="posix")
 check_env_name(b"PATH")
 sanitize_env_name("x", True)
 bad: Rules = "SHELL"
+reveal_type(InvalidEnvName("1A", "shell", "it starts with a digit", 0).rules)
 """
 
 
@@ -42,7 +43,13 @@ def mypy_output(tmp_path_factory: pytest.TempPathFactory) -> str:
 
 @pytest.mark.parametrize(
     ("line", "expected"),
-    [(5, "bool"), (6, "str"), (7, "str"), (8, "int | None")],
+    [
+        (5, "bool"),
+        (6, "str"),
+        (7, "str"),
+        (8, "int | None"),
+        (13, "Literal['shell'] | Literal['portable'] | Literal['environ']"),
+    ],
 )
 def test_results_are_typed(mypy_output: str, line: int, expected: str) -> None:
     match = re.search(rf"snippet\.py:{line}: note: Revealed type is \"(.+)\"", mypy_output)

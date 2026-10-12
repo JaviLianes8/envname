@@ -27,6 +27,7 @@ def test_returns_the_valid_name_unchanged() -> None:
         ("HOMe", "portable", "lower-case 'e' is not portable", 3),
         ("A\u0130", "portable", "'\u0130' is not allowed", 1),
         ("9a", "portable", "it starts with a digit", 0),
+        ("A\u00e9", "portable", "'\u00e9' is not allowed", 1),
         ("KEY=VALUE", "environ", "'=' separates the name from the value", 3),
         ("=C:", "environ", "'=' separates the name from the value", 0),
         ("A\x00B=", "environ", "NUL ends the string early", 1),
@@ -71,6 +72,36 @@ def test_survives_pickle_and_copy() -> None:
             0,
         )
         assert str(clone) == str(error)
+
+
+def test_str_subclass_cannot_make_the_explanation_disagree() -> None:
+    class Sly(str):
+        def __iter__(self):  # type: ignore[no-untyped-def]
+            return iter("A")
+
+        def __getitem__(self, index):  # type: ignore[no-untyped-def]
+            return "A"
+
+    with pytest.raises(InvalidEnvName) as caught:
+        check_env_name(Sly("-"))
+    assert (caught.value.reason, caught.value.index) == ("'-' is not allowed", 0)
+    assert type(check_env_name(Sly("OK"))) is str
+
+
+def test_rules_with_a_permissive_eq_are_rejected() -> None:
+    class Anything(str):
+        def __eq__(self, other: object) -> bool:
+            return True
+
+        __hash__ = str.__hash__
+
+    class Always:
+        def __eq__(self, other: object) -> bool:
+            return True
+
+    for rules in (Anything("zz"), Always()):
+        with pytest.raises(ValueError, match="rules must be one of"):
+            check_env_name("PATH", rules=rules)  # type: ignore[arg-type]
 
 
 def test_non_string_raises_type_error() -> None:

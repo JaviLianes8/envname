@@ -9,7 +9,7 @@ Progress:
 - [x] Contracts: real shell and real OS ground truth, typing, README examples, installed wheel e2e
 - [x] Docs: README, CHANGELOG, docstrings, packaging metadata
 - [x] Gates: ruff format, ruff check, mypy --strict, pytest
-- [ ] Independent review findings fixed with regression tests
+- [x] Independent review findings fixed with regression tests
 - [ ] Pull request opened, guard clean
 
 ## Starting point
@@ -91,3 +91,29 @@ against the sources below turned up these gaps:
 
 Left out on purpose: Windows case folding (see probes), camelCase splitting and `.env`
 file linting (both need policy choices this small library should not make).
+
+## Verification
+
+- Mutations: each guard was removed in turn (every rule pattern, the type and rule
+  checks, reasons and indexes, pickling arguments, transliteration, mark removal, prefix
+  validation, the leading-digit fix, upper-casing order, every CLI branch). Every
+  mutation made the suite fail. The bash and OS ground truth tests alone catch the
+  `shell` and `environ` pattern mutations; `portable` and NUL handling rest on the
+  hand-written vectors.
+
+## Review findings fixed
+
+- The README had the POSIX reasoning for `portable` backwards: lower-case names are the
+  ones kept for applications. Reworded.
+- A `str` subclass overriding iteration could make `check_env_name` crash while
+  explaining; names and rules are now copied to exact strings first.
+- A `rules` object with a permissive `__eq__` slipped past the check and raised
+  `KeyError`; it now raises `ValueError`.
+- `environ` checks the string, not its POSIX encoding: documented.
+- Marks with combining class 0 (the grapheme joiner) were turned into underscores; the
+  sanitizer now drops every nonspacing and enclosing mark.
+- An invalid `--prefix` was reported with the top-level usage; it now uses the
+  `sanitize` usage.
+- `InvalidEnvName.rules` is typed as `Rules`; the comment on pickling was corrected;
+  CONTRIBUTING names the two tests that touch real systems; the sdist leaves out this
+  file.

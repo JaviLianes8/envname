@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Literal, get_args
+from typing import Literal, cast, get_args
 
 Rules = Literal["shell", "portable", "environ"]
 """The rule sets a name can be checked against.
@@ -34,11 +34,11 @@ class InvalidEnvName(ValueError):
     name as a whole is the problem (it is empty).
     """
 
-    def __init__(self, name: str, rules: str, reason: str, index: int | None = None) -> None:
-        # Every field goes to ValueError so the exception pickles and copies intact.
+    def __init__(self, name: str, rules: Rules, reason: str, index: int | None = None) -> None:
+        # args must match __init__ so that unpickling can call the class again.
         super().__init__(name, rules, reason, index)
         self.name = name
-        self.rules = rules
+        self.rules: Rules = rules
         self.reason = reason
         self.index = index
 
@@ -50,16 +50,20 @@ class InvalidEnvName(ValueError):
 def _require_str(value: object, what: str) -> str:
     if not isinstance(value, str):
         raise TypeError(f"{what} must be str, not {type(value).__name__}")
-    return value
+    # An exact str copy: a subclass could override iteration or indexing and make
+    # the explanation disagree with the regular expression that judged the name.
+    return str.__str__(value)
 
 
-def _require_rules(rules: object) -> str:
-    if rules not in RULES:
+def _require_rules(rules: object) -> Rules:
+    # Compare an exact str, so an object with a permissive __eq__ cannot slip through.
+    chosen = str.__str__(rules) if isinstance(rules, str) else None
+    if chosen not in _FAST:
         raise ValueError(f"rules must be one of {', '.join(map(repr, RULES))}, not {rules!r}")
-    return str(rules)
+    return cast(Rules, chosen)
 
 
-def _problem(name: str, rules: str) -> tuple[str, int | None]:
+def _problem(name: str, rules: Rules) -> tuple[str, int | None]:
     if not name:
         return "it is empty", None
     if rules == "environ":
@@ -90,7 +94,7 @@ def is_valid_env_name(name: str, *, rules: Rules = "shell") -> bool:
 
 
 def check_env_name(name: str, *, rules: Rules = "shell") -> str:
-    """Return ``name`` unchanged if it is valid under ``rules``.
+    """Return ``name`` as a plain ``str`` if it is valid under ``rules``.
 
     Raises ``InvalidEnvName`` (a ``ValueError``) naming the reason and the index of
     the first offending character otherwise.

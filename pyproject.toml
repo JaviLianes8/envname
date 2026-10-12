@@ -44,6 +44,9 @@ Changelog = "https://github.com/JaviLianes8/envname/blob/main/CHANGELOG.md"
 LinkedIn = "https://www.linkedin.com/in/jlianes/"
 Funding = "https://buymeacoffee.com/jlianesglrs"
 
+[tool.hatch.build.targets.sdist]
+exclude = ["IMPROVEMENTS-round.md"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/envname"]
 

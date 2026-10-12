@@ -8,6 +8,7 @@ import unicodedata
 from ._rules import _require_str, check_env_name
 
 _INVALID_RUN = re.compile(r"[^A-Za-z0-9_]+")
+_MARKS = frozenset({"Mn", "Me"})
 
 
 def _fold_to_ascii(text: str) -> str:
@@ -15,7 +16,9 @@ def _fold_to_ascii(text: str) -> str:
     # maps compatibility forms (ligatures, full-width letters, circled digits) to plain
     # ones; dropping the marks keeps the letter instead of losing it to an underscore.
     decomposed = unicodedata.normalize("NFKD", text)
-    return "".join(char for char in decomposed if not unicodedata.combining(char))
+    # Some marks (the grapheme joiner, variation selectors) have combining class 0, so
+    # the general category decides what counts as a mark.
+    return "".join(char for char in decomposed if unicodedata.category(char) not in _MARKS)
 
 
 def sanitize_env_name(s: str, *, upper: bool = True, prefix: str = "") -> str:

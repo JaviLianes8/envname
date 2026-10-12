@@ -68,7 +68,9 @@ def test_sanitize_rejects_an_invalid_prefix(capsys: pytest.CaptureFixture[str]) 
     assert caught.value.code == 2
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert "--prefix: invalid shell environment variable name '1-'" in captured.err
+    assert "envname sanitize: error: --prefix: invalid shell environment variable name '1-'" in (
+        captured.err
+    )
 
 
 def test_a_command_is_required(capsys: pytest.CaptureFixture[str]) -> None:

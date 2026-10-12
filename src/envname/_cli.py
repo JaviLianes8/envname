@@ -10,7 +10,7 @@ from ._rules import RULES, InvalidEnvName, check_env_name
 from ._sanitize import sanitize_env_name
 
 
-def _parser() -> argparse.ArgumentParser:
+def _parser() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
     parser = argparse.ArgumentParser(
         prog="envname", description="Validate and sanitize environment variable names."
     )
@@ -22,7 +22,7 @@ def _parser() -> argparse.ArgumentParser:
     sanitize.add_argument("texts", nargs="+", metavar="TEXT")
     sanitize.add_argument("--keep-case", action="store_true", help="do not upper-case")
     sanitize.add_argument("--prefix", default="", help="a valid name to put in front")
-    return parser
+    return parser, sanitize
 
 
 def _warn(message: str) -> None:
@@ -35,7 +35,7 @@ def _warn(message: str) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command line and return its exit status."""
-    parser = _parser()
+    parser, sanitize = _parser()
     args = parser.parse_args(argv)
     if args.command == "check":
         failed = False
@@ -50,5 +50,5 @@ def main(argv: Sequence[str] | None = None) -> int:
         for text in args.texts:
             print(sanitize_env_name(text, upper=not args.keep_case, prefix=args.prefix))
     except InvalidEnvName as exc:
-        parser.error(f"--prefix: {exc}")
+        sanitize.error(f"--prefix: {exc}")
     return 0

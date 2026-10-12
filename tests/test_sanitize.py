@@ -25,6 +25,8 @@ from envname import InvalidEnvName, check_env_name, is_valid_env_name, sanitize_
         ("stra\u00dfe", "STRA_E"),
         ("\u00f8l", "_L"),
         ("PATH", "PATH"),
+        ("a\u034fb", "AB"),
+        ("x\u20ddy", "XY"),
     ],
 )
 def test_sanitizes(raw: str, expected: str) -> None:

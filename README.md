@@ -99,22 +99,26 @@ APP_MAX_CONNECTIONS
 | `rules` | A valid name | Source | Use it for |
 | --- | --- | --- | --- |
 | `"shell"` (default) | `[A-Za-z_][A-Za-z0-9_]*` | POSIX XBD 3.216 "Name", the Bash manual | names you export from a shell, reference as `$NAME` or `${NAME}`, or interpolate in Compose files |
-| `"portable"` | `[A-Z_][A-Z0-9_]*` | POSIX XBD 8.1, the names the standard utilities use | names you publish for other people: settings, documentation, deployment manifests |
-| `"environ"` | not empty, no `=`, no NUL | POSIX `setenv`, the Windows environment documentation | names you read back from `os.environ` or pass through to a child process |
+| `"portable"` | `[A-Z_][A-Z0-9_]*` | POSIX XBD 8.1, the names the standard utilities use | names that follow the upper-case convention of the POSIX utilities, which most deployment tooling copies |
+| `"environ"` | not empty, no `=`, no NUL | the C-level rules of POSIX `setenv` and the Windows environment documentation | names you read back from `os.environ` or pass through to a child process |
 
 `portable` names are `shell` names, and `shell` names are `environ` names. Names are
 matched case-sensitively and only ASCII letters count, as in the C locale.
 
 Things worth knowing:
 
-- POSIX reserves names with lower-case letters for applications and advises against
-  names that start with a digit anywhere, which is why `portable` exists.
+- POSIX keeps names with lower-case letters for applications, so they never clash with
+  a variable a standard utility reads; upper-case `portable` names follow the
+  utilities' own convention. POSIX advises against a leading digit in either case.
 - Windows matches names case-insensitively, and Python's `os.environ` upper-cases keys
   there. Windows uses its own case table, which disagrees with Python's `str.upper` for
   letters such as `ß`, `ı` and `ﬁ`, so `envname` does not try to fold case for you:
   stick to `portable` names when they must work on Windows too.
 - Windows allows a leading `=` for the hidden per-drive variables such as `=C:`, while
   its documentation says names cannot contain `=`. `environ` follows the documentation.
+- `environ` checks the string, not its encoding. On POSIX, Python encodes names with
+  `os.fsencode`, so a lone surrogate outside U+DC80 to U+DCFF passes the rule but
+  cannot be set there; Windows accepts it.
 - Windows limits a variable to 32,767 characters, name and value together; Python
   enforces that in `os.environ`. A name on its own cannot know its value, so no rule
   limits length.
