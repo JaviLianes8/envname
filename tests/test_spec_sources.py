@@ -110,7 +110,7 @@ def test_lower_case_names_are_left_to_applications() -> None:
     [
         ("posix-xbd-chap08.html", "These strings have the form", "shall not contain any bytes"),
         ("posix-setenv.html", "The envname argument points to an empty string", "'=' character"),
-        ("windows-environment-variables.html", "The name of an environment variable", "(=)"),
+        ("windows-environment-variables.md", "The name of an environment variable", "(=)"),
     ],
 )
 def test_environ_rejects_what_the_sources_forbid(source: str, start: str, wording: str) -> None:

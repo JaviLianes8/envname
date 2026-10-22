@@ -36,22 +36,25 @@
     "sha256": "ee4b55f3f78c2c26ac3f9cfb7e9cc78eb1de3211d3f89c9fd86a0c921f60cfbe"
   },
   "bash-manual.html": {
-    "title": "GNU Bash Reference Manual (one page)",
-    "url": "https://www.gnu.org/software/bash/manual/bash.html",
-    "revision": "as served on the fetch date",
+    "title": "GNU Bash Reference Manual (one page), doc/bashref.html of the bash 5.3 release",
+    "url": "https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz",
+    "member": "bash-5.3/doc/bashref.html",
+    "revision": "bash 5.3 release archive (immutable)",
     "licence": "GNU Free Documentation License 1.3, https://www.gnu.org/licenses/fdl-1.3.html",
     "fetched": "2026-10-22",
-    "size": 1040954,
-    "sha256": "78d0eefbe60cfe7345ffdafede7294f055b04e53bd520360ff699b24f81e2b4b"
+    "archive_size": 11355854,
+    "archive_sha256": "0d5cd86965f869a26cf64f4b71be7b96f90a3ba8b3d74e27e8e9d9d5550f31ba",
+    "size": 1040870,
+    "sha256": "b91026acffb159bd1e842e3116a95539bf858e2b57cbfa74df9e3a53379177a4"
   },
-  "windows-environment-variables.html": {
-    "title": "Microsoft Learn, Environment Variables (Win32 processes and threads)",
-    "url": "https://learn.microsoft.com/en-us/windows/win32/procthread/environment-variables",
-    "revision": "as served on the fetch date",
-    "licence": "Microsoft Learn terms of use, https://learn.microsoft.com/en-us/legal/termsofuse",
+  "windows-environment-variables.md": {
+    "title": "Microsoft Learn, Environment Variables (Win32 processes and threads), page source",
+    "url": "https://raw.githubusercontent.com/MicrosoftDocs/win32/3aee48ac3f48e187d17bdfd56951741737331749/desktop-src/ProcThread/environment-variables.md",
+    "revision": "commit 3aee48ac3f48e187d17bdfd56951741737331749",
+    "licence": "CC-BY-4.0, https://github.com/MicrosoftDocs/win32/blob/docs/LICENSE",
     "fetched": "2026-10-22",
-    "size": 51684,
-    "sha256": "d3d37408283e92af349b906b8f6de4766a0cbd14208e0e68d2cb8dc34b683ab8"
+    "size": 4191,
+    "sha256": "32b21e37b84b631a003190afc9ecdb81e9a75b51fc8f362ced6d30d52b80ad95"
   },
   "UnicodeData-13.0.0.txt": {
     "title": "Unicode Character Database 13.0.0, UnicodeData.txt",

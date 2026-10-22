@@ -127,9 +127,11 @@ Things worth knowing:
 - `environ` checks the string, not its encoding. On POSIX, Python encodes names with
   `os.fsencode`, so a lone surrogate outside U+DC80 to U+DCFF passes the rule but
   cannot be set there; Windows accepts it.
-- Windows limits a variable to 32,767 characters, name and value together; Python
-  enforces that in `os.environ`. A name on its own cannot know its value, so no rule
-  limits length.
+- The Windows documentation gives 32,767 characters as the largest size of a variable.
+  Python's `os.putenv` on Windows refuses a `name=value` string longer than that, so
+  name and value together can hold 32,766 characters, while `SetEnvironmentVariableW`
+  itself stores longer names. A name on its own cannot know its value, so no rule limits
+  length.
 - `.env` parsers are looser than shells: python-dotenv takes any unquoted key without
   `=`, `#` or whitespace. Such keys load, but a shell cannot read them, and Compose only
   interpolates `$NAME` when the name matches `[_a-z][_a-z0-9]*` ignoring case, which for

@@ -119,7 +119,7 @@ def test_every_guide_example_runs() -> None:
         runner.run(test, clear_globs=False)
         session.update(test.globs)
     results = runner.summarize(verbose=False)
-    assert results.failed == 0 and results.attempted == 14
+    assert results.failed == 0 and results.attempted == 15
 
 
 def test_the_why_section_states_facts() -> None:
@@ -135,3 +135,30 @@ def test_the_why_section_states_facts() -> None:
     )
     assert accepted.returncode == 0 and not is_valid_env_name("my-var")
     assert is_valid_env_name("ProgramFiles(x86)", rules="environ")
+
+
+WINDOWS_LIMITS = """
+import ctypes, os
+def refused(name, value):
+    try:
+        os.putenv(name, value)
+    except ValueError:
+        return True
+    return False
+assert not refused("A", "v" * 32765) and refused("A", "v" * 32766)
+assert not refused("B" * 32766, "") and refused("B" * 32767, "")
+kernel = ctypes.WinDLL("kernel32")
+kernel.SetEnvironmentVariableW.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p]
+kernel.GetEnvironmentVariableW.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32]
+name, buffer = "Q" * 40000, ctypes.create_unicode_buffer(8)
+assert kernel.SetEnvironmentVariableW(name, "v")
+assert kernel.GetEnvironmentVariableW(name, buffer, 8) == 1 and buffer.value == "v"
+"""
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the claim is about Windows")
+def test_the_windows_length_limits_are_as_stated() -> None:
+    assert "can hold 32,766 characters" in _readme()
+    # A child process, so the oversized variable never lands in this one.
+    result = subprocess.run([sys.executable, "-I", "-c", WINDOWS_LIMITS], check=False)
+    assert result.returncode == 0

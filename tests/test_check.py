@@ -127,3 +127,16 @@ def test_rules_given_as_a_str_subclass_are_stored_as_exact_str() -> None:
     with pytest.raises(InvalidEnvName) as caught:
         check_env_name("1A", rules=Sly("shell"))  # type: ignore[arg-type]
     assert type(caught.value.rules) is str and caught.value.rules == "shell"
+
+
+def test_error_holds_an_exact_str_of_the_real_name() -> None:
+    class Disguised(str):
+        def __str__(self) -> str:
+            return "OK_NAME"
+
+    with pytest.raises(InvalidEnvName) as caught:
+        check_env_name(Disguised("1-bad"))
+    assert type(caught.value.name) is str and caught.value.name == "1-bad"
+    assert str(caught.value) == (
+        "invalid shell environment variable name '1-bad': it starts with a digit at index 0"
+    )

@@ -101,6 +101,10 @@ SHAPES = {
     "NUL at the end": lambda n: "a" * n + "\x00",
     "marks": lambda n: "e\u0301" * n,
     "runs": lambda n: "a-" * n,
+    # One long run of combining marks of two classes, which NFKD has to reorder.
+    "mixed marks": lambda n: "a" + "\u0301\u0316" * (n // 2),
+    # One character that decomposes into eighteen.
+    "long decomposition": lambda n: "\ufdfa" * n,
 }
 
 

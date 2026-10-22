@@ -103,10 +103,12 @@ A `ValueError` with four attributes:
 - `reason`: a short explanation, as listed above.
 - `index`: the position of the first offending character, or None for an empty name.
 
-The message is `invalid <rules> environment variable name <name>: <reason> at index
-<index>`. It quotes at most the first 60 characters of the name and then gives its
-length, so a huge name cannot flood a log. The error pickles and copies with every
-attribute, and its pickle refers to `envname.InvalidEnvName`.
+The message is `invalid <rules> environment variable name <name>: <reason>`, followed by
+` at index <index>` unless `index` is None. The quoted name stops before its first `=`,
+since what follows is usually a value and often a secret, and is cut at 60 characters;
+when anything is left out, the message gives the full length instead, so a huge name
+cannot flood a log. `repr(error)` quotes the name the same way. The error pickles and
+copies with every attribute, and its pickle refers to `envname.InvalidEnvName`.
 
 ```pycon
 >>> try:
@@ -116,6 +118,11 @@ attribute, and its pickle refers to `envname.InvalidEnvName`.
 ...     print(str(error).split("... ")[1])
 101 100
 (101 characters): '-' is not allowed at index 100
+>>> try:
+...     check_env_name("API_KEY=s3cret", rules="environ")
+... except InvalidEnvName as error:
+...     print(error)
+invalid environ environment variable name 'API_KEY'... (14 characters): '=' separates the name from the value at index 7
 
 ```
 
@@ -128,8 +135,10 @@ Turns any text into a valid name, in this order:
 1. Unicode NFKD decomposition, then every nonspacing and enclosing mark (general
    category Mn or Me) is dropped. Accented letters keep their base letter (`é` to `e`),
    ligatures and full-width forms become plain letters (`ﬁ` to `fi`, `Ａ` to `A`).
-2. Every run of characters outside `[A-Za-z0-9_]` becomes one `_`. Letters with no
-   ASCII decomposition, such as `ß`, `ø` or any CJK character, end up there.
+2. Every run of characters outside `[A-Za-z0-9_]` becomes one `_`; underscores already in
+   the text are kept as they are. Letters with no ASCII decomposition, such as `ß`, `ø` or
+   any CJK character, end up there, and so do spacing marks (category Mc) and
+   whitespace, including at the ends of the text.
 3. `prefix` goes in front. It must be empty or a valid `shell` name, or the call raises
    `InvalidEnvName`.
 4. An `_` goes in front when the result is empty or starts with a digit.
@@ -137,7 +146,10 @@ Turns any text into a valid name, in this order:
 
 The result is always a valid `shell` name, and a valid `portable` one when upper-cased.
 Upper-cased output passes through unchanged, so sanitizing twice changes nothing.
-`TypeError` when `text` or `prefix` is not a `str`.
+Nothing is cut: the result is as long as the text needs. The time taken grows in
+proportion to the length of the text, whatever it holds.
+`TypeError` when `text` or `prefix` is not a `str`, or when `upper` is not a `bool`
+(`upper="false"` is an error, not a true value).
 
 ```pycon
 >>> from envname import sanitize_env_name
@@ -165,9 +177,12 @@ envname --version
 - `check` prints nothing and exits 0 when every name is valid. Otherwise it prints one
   line per invalid name on stderr, `envname: <message>`, and exits 1. Characters the
   console cannot show are escaped rather than crashing the report.
-- `sanitize` prints one name per `TEXT` on stdout and exits 0.
+- `sanitize` prints one name per `TEXT` on stdout and exits 0. When the reader of its
+  output goes away early, as in `envname sanitize ... | head -1`, it stops quietly and
+  exits 141, the status a shell gives a program stopped by a closed pipe.
 - A usage error (an unknown option or rule set, a missing argument, an invalid
-  `--prefix`) exits 2 with a usage message on stderr.
+  `--prefix`) exits 2 with a usage message on stderr. The message quotes at most 300
+  characters of what it complains about.
 - Put `--` before a name that starts with `-`.
 
 ## Stability
@@ -183,8 +198,10 @@ has no dependencies.
 
 ## Sources
 
-Fetched on 2026-10-22 and checked in the test suite (`tests/upstream/MANIFEST.json`
-records the revision and sha256 of each):
+Fetched on 2026-10-22 and checked in the test suite. Each one is pinned to a fixed
+revision (a release, a commit or a versioned path), and `tests/upstream/MANIFEST.json`
+records its URL, revision, size and sha256, so `python scripts/fetch_upstream.py` gets
+the same bytes for everyone:
 
 - POSIX.1-2024 XBD 3.216 Name and 6.1 Portable Character Set:
   https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap03.html and
@@ -192,9 +209,12 @@ records the revision and sha256 of each):
 - POSIX.1-2024 XBD 8.1 Environment Variable Definition:
   https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap08.html
 - POSIX `setenv`: https://pubs.opengroup.org/onlinepubs/9799919799/functions/setenv.html
-- The Bash Reference Manual: https://www.gnu.org/software/bash/manual/bash.html
-- Windows environment variables:
-  https://learn.microsoft.com/en-us/windows/win32/procthread/environment-variables
+- The Bash Reference Manual, `doc/bashref.html` in the bash 5.3 release archive:
+  https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz (the manual is also at
+  https://www.gnu.org/software/bash/manual/bash.html)
+- Windows environment variables, the source of the Microsoft Learn page
+  (https://learn.microsoft.com/en-us/windows/win32/procthread/environment-variables) at
+  commit 3aee48a of https://github.com/MicrosoftDocs/win32
 - The Unicode Character Database, `UnicodeData.txt` for Unicode 13.0.0 to 16.0.0 (the
   versions of Python 3.10 to 3.14): https://www.unicode.org/Public/
 - python-dotenv `parser.py` and compose-go `template/template.go`, at the commits in the

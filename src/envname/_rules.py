@@ -29,10 +29,12 @@ _SHOWN = 60
 
 
 def _quote(text: str) -> str:
-    # A name can be megabytes long: a message quotes its start and says how long it is.
-    if len(text) <= _SHOWN:
+    # A name can be megabytes long, and what follows an "=" is usually a value, often a
+    # secret: quote the start of the name, never past its first "=", and say how long it is.
+    shown = text.partition("=")[0][:_SHOWN]
+    if shown == text:
         return repr(text)
-    return f"{text[:_SHOWN]!r}... ({len(text)} characters)"
+    return f"{shown!r}... ({len(text)} characters)"
 
 
 class InvalidEnvName(ValueError):
@@ -41,7 +43,8 @@ class InvalidEnvName(ValueError):
     ``name`` is the whole name, ``rules`` the rule set it was checked against,
     ``reason`` a short explanation and ``index`` the position of the first offending
     character, or None when the name as a whole is the problem (it is empty). The
-    message quotes at most the first 60 characters of the name.
+    message and the ``repr`` quote at most the first 60 characters of the name and
+    stop before its first ``=``.
 
     >>> try:
     ...     check_env_name("1ST", rules="portable")
@@ -62,6 +65,11 @@ class InvalidEnvName(ValueError):
         where = "" if self.index is None else f" at index {self.index}"
         name = _quote(str(self.name))
         return f"invalid {self.rules} environment variable name {name}: {self.reason}{where}"
+
+    def __repr__(self) -> str:
+        # args hold the whole name; the repr is as short and as safe as the message.
+        fields = f"{self.rules!r}, {self.reason!r}, {self.index!r}"
+        return f"{type(self).__name__}({_quote(str(self.name))}, {fields})"
 
 
 def _require_str(value: object, what: str) -> str:
