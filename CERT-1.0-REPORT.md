@@ -17,6 +17,7 @@ Progress:
 - [x] Gates (item 15)
 - [x] PR #3 and trace guard CLEAN
 - [x] QA lenses round 1: every finding fixed at 7b0ddad (none disputed)
+- [x] QA lenses round 2: every finding fixed at 9b27a1e (none disputed)
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer reports PASS (item 16)
 
@@ -214,7 +215,38 @@ Verification at 7b0ddad:
   `ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest` each exit 0;
   250 passed, 1 skipped (no `bash` there).
 
-Round 2 verdicts: pending.
+### Round 2 (reviewed 5b635dd, fixed in 9b27a1e)
+
+Lens (b) reported no finding. Lenses (a) and (c) re-verified every round 1 fix at 5b635dd
+(fresh clone fetch 13/13, linear sanitize, no secret after `=`, bounded errors, exit 141).
+Every finding below is fixed; none is disputed. The behaviour bug was first pinned by a
+contract test that failed on 5b635dd (`AttributeError`, exit 1).
+
+| Lens | Finding | Severity | Fix |
+| --- | --- | --- | --- |
+| c, d | N1: `envname sanitize` with no stdout at all (`>&-`, `pythonw`) crashed in `sys.stdout.flush()` with `AttributeError` and exit 1 (0.2.0 exited 0); a regression of the round 1 pipe fix | low | `_print_lines` returns 0 when `sys.stdout` is None. `tests/test_cli_contract.py`: in-process with `sys.stdout = None`, and a child started by `bash` with `>&-` that must exit 0 with empty stderr. CHANGELOG and GUIDE say so |
+| a | A5: CHANGELOG's "over 30 seconds for 200,000 characters" held only for the worst order of marks | low | the absolute figure is dropped; the entry says the time grew with the square of the length |
+| e | G1 (N11): nothing pinned that an unknown `--rules` value is quoted up to its `=` and 60 characters | medium | exact last line for `--rules TOKEN=hunter2` (no `hunter2`) and for a 200-character value |
+| e | G2 (N22): nothing pinned that a write error other than a gone reader propagates | medium | a stdout raising `ENOSPC` must raise `OSError` with that errno, never exit 141 |
+| e | G3 (N15, N16, N18): the 300-character cap on usage errors was only bounded below 1000 | medium | exact last line for messages of 300 (whole), 301 and 2066 characters (cut at 300 plus `... (N characters)`); GUIDE states the cut |
+| e | G4 (N10): `repr` of an `InvalidEnvName` subclass | low | `repr(Mine(...))` starts with `Mine(` in `test_repr_is_as_short_as_the_message` |
+| e | G5 (N14): GUIDE synopsis not tied to `check --help` | low | the usage line must contain `[--rules {shell,portable,environ}]` and the GUIDE synopsis line must be present |
+| e | G6 (N33, N36, N39): `fetch_upstream.py --update` and the size-and-sha256 check untested | low | an `--update` test (files saved; `size`, `sha256`, `archive_*` and `fetched` rewritten in MANIFEST.json) and a refusal of same-size bytes with another sha256 |
+
+Every surviving mutant reported in this round was re-applied one at a time to 9b27a1e and
+is now killed: N1, N11, N22, N15, N16, N18, N14 by `test_cli_contract.py`, N10 by
+`test_messages.py`, N33, N36, N39 by `test_fetch_upstream.py`.
+
+Verification at 9b27a1e:
+
+- This PC: `ruff format --check .`, `ruff check .`, `mypy --strict src` and
+  `mypy --strict src tests` exit 0.
+- Another machine, CPython 3.14.2, clean clone with the fetched sources, Git's `bash`,
+  python-dotenv and `ENVNAME_E2E=1`: `pytest` exits 0, 261 passed, 1 skipped (one fetched
+  file was not copied there); that file's tests, `test_spec_sources.py`, pass here, 8
+  passed.
+
+Round 3 verdicts: pending.
 
 ## Independent review (item 16)
 
