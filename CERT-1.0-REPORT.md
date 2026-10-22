@@ -270,11 +270,48 @@ Verification at b553ca7:
   python-dotenv and `ENVNAME_E2E=1`: `pytest` exits 0, 291 passed, 1 skipped (one fetched
   file was not copied there).
 
+### Round 4 (reviewed d04c5c1, fixed in 0a50825)
+
+Lenses (c) and (d) both re-verified N2 (no stderr) as fixed: in process, under `2>&-` and
+under `pythonw`, on 3.10 to 3.14 and 3.14t, wheel- and sdist-installed, with no regression
+of F1 to F6 or N1. Both reported the same new finding in two halves (lens c N3 and N4, lens
+d N3): a stream that exists but whose reader has gone. Not a regression (0.2.0 exits 120
+too, checked here on 3.10.19 and 3.13.2), but 1.0.0 promised the status survives a lost
+message. Fixed; none is disputed. It was first pinned by `tests/test_cli_gone_reader.py`,
+which fails on d04c5c1: 10 of its 14 tests on CPython 3.13.2.
+
+| Lens | Finding | Severity | Fix |
+| --- | --- | --- | --- |
+| c, d | c N3 / d N3: `_warn` had no `OSError` handling, so `check 1A` with the stderr reader gone raised `BrokenPipeError` (EINVAL on Windows) out of `main()`, stopped checking, and the process exited 120 instead of 1 | low | `_warn` writes and flushes inside `try`; on a gone reader (EPIPE, or EINVAL on Windows) it points the stream's descriptor at the null device and tells `main` to stop reporting, which keeps checking and returns 1 (or 0). Any other write error, such as `ENOSPC`, still propagates, as on stdout. Shared helpers `_reader_gone` and `_to_null` now serve `_print_lines` too |
+| c, d | c N4 / d N3: `_Parser._print_message` swallowed the write `OSError` but left the text in the stream buffer, so the flush at interpreter shutdown failed and the process exited 120: a usage error with the stderr reader gone (GUIDE: 2), `--help` and `--version` with the stdout reader gone (GUIDE: 0, plus `Exception ignored ... OSError` on stderr) | low | `_print_message` writes and flushes inside `try`; on any `OSError` it points the stream's descriptor at the null device, so the shutdown flush succeeds: 2 for usage errors, 0 for `--help` and `--version`. The in-memory `ENOSPC` contract from round 3 still passes |
+
+Tests (`tests/test_cli_gone_reader.py`): a child started with the read end of its pipe
+already closed, on stderr for `check PATH` (0), `check 1A` (1), `check` with 3000 invalid
+names and one valid (1), a bad `--prefix`, `--bogus` and an unknown command (2), and on
+stdout for `--version`, `--help`, `check --help` (0) and `sanitize` (141, the control);
+each must also leave the other stream empty (no usage line, no `Exception ignored`). In
+process: a stderr raising `BrokenPipeError`, and EINVAL with the platform set to Windows,
+is written once and `main` returns 1; a stderr raising `ENOSPC` still raises; `--help` with
+a gone stdout reader exits 0. GUIDE and CHANGELOG say so.
+
+Verification of the fix:
+
+- This PC: lens (d)'s `brokenpipe.py` (7 cases) passes 7 of 7 on CPython 3.10.19, 3.11.5,
+  3.12.12, 3.13.2, 3.14.2 and 3.14.2 free-threaded (on the 0.2.0 source it fails 6 of 7,
+  with 120 for each broken stream). Lens (c)'s git-bash repros print 1 for
+  `check 1X 2>&1 | head -c 0`, 0 for `--help 2>/dev/null | head -c 0`, 2 for `--bogus`
+  and 141 for `sanitize`. `ruff format --check .`, `ruff check .`, `mypy --strict src` and
+  `mypy --strict src tests` exit 0.
+- Another machine, CPython 3.14.2, the working tree with the fetched sources, Git's `bash`,
+  python-dotenv and `ENVNAME_E2E=1`, each command on its own: `ruff format --check .`,
+  `ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest` exit 0; 306
+  passed, none skipped.
+
 ### Disputed findings
 
-None in round 3.
+None in rounds 3 and 4.
 
-Round 4 verdicts: pending.
+Round 5 verdicts: pending.
 
 ## Independent review (item 16)
 
