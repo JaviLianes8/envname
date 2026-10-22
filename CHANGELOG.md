@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-22
+
+The first release on PyPI (0.1.0 and 0.2.0 were never uploaded there). The public API
+is now stable and follows Semantic Versioning: the five names in `__all__`, their
+parameter names and defaults, the three rule sets, the error types and their
+attributes, and the command line with its exit codes.
+
+### Changed
+
+- `sanitize_env_name` names its first parameter `text` (it was `s`). A value that is
+  not a string raises `TypeError: text must be str, not ...`.
+- Error messages quote at most the first 60 characters of a name and then give its
+  length, so a huge name cannot flood a log; `InvalidEnvName.name` keeps the whole name.
+  An unknown `rules` value that is not a string is named by its type, never by its
+  `repr`.
+- The public objects report `envname` as their module, so a pickled `InvalidEnvName`
+  and `help()` no longer depend on the private module layout.
+
+### Added
+
+- `envname --version`.
+- A runnable example in every public docstring, checked as a doctest, and a
+  [guide](https://github.com/JaviLianes8/envname/blob/main/GUIDE.md) with the full
+  reference.
+
 ## [0.2.0]
 
 ### Added

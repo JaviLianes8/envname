@@ -54,9 +54,9 @@ def test_invalid_prefix_is_rejected(prefix: str) -> None:
         sanitize_env_name("x", prefix=prefix)
 
 
-@pytest.mark.parametrize(("arg", "value"), [("s", None), ("s", b"x"), ("prefix", None)])
+@pytest.mark.parametrize(("arg", "value"), [("text", None), ("text", b"x"), ("prefix", None)])
 def test_non_string_input_raises_type_error(arg: str, value: object) -> None:
-    kwargs: dict[str, object] = {"s": "x", arg: value}
+    kwargs: dict[str, object] = {"text": "x", arg: value}
     with pytest.raises(TypeError, match=f"{arg} must be str"):
         sanitize_env_name(**kwargs)  # type: ignore[arg-type]
 

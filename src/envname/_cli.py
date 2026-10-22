@@ -11,9 +11,12 @@ from ._sanitize import sanitize_env_name
 
 
 def _parser() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
+    from . import __version__
+
     parser = argparse.ArgumentParser(
         prog="envname", description="Validate and sanitize environment variable names."
     )
+    parser.add_argument("--version", action="version", version=f"envname {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
     check = commands.add_parser("check", help="exit 1 if any NAME is invalid")
     check.add_argument("names", nargs="+", metavar="NAME")
