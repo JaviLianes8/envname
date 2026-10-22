@@ -27,6 +27,8 @@ def test_returns_the_valid_name_unchanged() -> None:
         ("HOMe", "portable", "lower-case 'e' is not portable", 3),
         ("A\u0130", "portable", "'\u0130' is not allowed", 1),
         ("9a", "portable", "it starts with a digit", 0),
+        ("\u0663A", "shell", "'\u0663' is not allowed", 0),
+        ("\uff10A", "portable", "'\uff10' is not allowed", 0),
         ("A\u00e9", "portable", "'\u00e9' is not allowed", 1),
         ("KEY=VALUE", "environ", "'=' separates the name from the value", 3),
         ("=C:", "environ", "'=' separates the name from the value", 0),
@@ -112,3 +114,16 @@ def test_non_string_raises_type_error() -> None:
 def test_unknown_rules_raise_before_checking() -> None:
     with pytest.raises(ValueError, match="rules must be one of"):
         check_env_name("PATH", rules="posix")  # type: ignore[arg-type]
+
+
+def test_rules_given_as_a_str_subclass_are_stored_as_exact_str() -> None:
+    class Sly(str):
+        def __eq__(self, other: object) -> bool:
+            return True
+
+        def __hash__(self) -> int:
+            return hash("shell")
+
+    with pytest.raises(InvalidEnvName) as caught:
+        check_env_name("1A", rules=Sly("shell"))  # type: ignore[arg-type]
+    assert type(caught.value.rules) is str and caught.value.rules == "shell"

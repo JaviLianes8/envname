@@ -28,22 +28,27 @@ DIGITS = set(string.digits)
 LONGEST_MESSAGE = 800
 
 
-def _model(name: str, rules: str) -> int | bool | None:
-    """Return True when valid, else the offending index (None for an empty name)."""
+def _model(name: str, rules: str) -> tuple[str, int | None] | None:
+    """Return None when valid, else the reason and the offending index."""
     if not name:
-        return None
+        return "it is empty", None
     if rules == "environ":
         for index, char in enumerate(name):
-            if char in "=\x00":
-                return index
-        return True
-    first = (UPPER if rules == "portable" else LETTERS) | {"_"}
+            if char == "=":
+                return "'=' separates the name from the value", index
+            if char == "\x00":
+                return "NUL ends the string early", index
+        return None
+    allowed = (UPPER if rules == "portable" else LETTERS) | {"_"} | DIGITS
     if name[0] in DIGITS:
-        return 0
+        return "it starts with a digit", 0
     for index, char in enumerate(name):
-        if char not in first | DIGITS:
-            return index
-    return True
+        if char in allowed:
+            continue
+        if rules == "portable" and char in string.ascii_lowercase:
+            return f"lower-case {char!r} is not portable", index
+        return f"{char!r} is not allowed", index
+    return None
 
 
 def _names(seed: int, count: int) -> list[str]:
@@ -60,14 +65,15 @@ def _names(seed: int, count: int) -> list[str]:
 def test_every_name_agrees_with_the_model(seed: int, rules: str) -> None:
     for name in _names(seed, 4000):
         verdict = _model(name, rules)
-        assert is_valid_env_name(name, rules=rules) == (verdict is True), repr(name)  # type: ignore[arg-type]
-        if verdict is True:
+        assert is_valid_env_name(name, rules=rules) == (verdict is None), repr(name)  # type: ignore[arg-type]
+        if verdict is None:
             assert check_env_name(name, rules=rules) == name  # type: ignore[arg-type]
             continue
         with pytest.raises(InvalidEnvName) as caught:
             check_env_name(name, rules=rules)  # type: ignore[arg-type]
         error = caught.value
-        assert (error.name, error.rules, error.index) == (name, rules, verdict), repr(name)
+        reason, index = verdict
+        assert (error.name, error.rules, error.reason, error.index) == (name, rules, reason, index)
         assert len(str(error)) <= LONGEST_MESSAGE
 
 
@@ -76,8 +82,8 @@ def test_sanitized_names_are_valid_and_stable(seed: int) -> None:
     for text in _names(seed, 4000):
         upper = sanitize_env_name(text)
         kept = sanitize_env_name(text, upper=False)
-        assert _model(upper, "portable") is True, repr(text)
-        assert _model(kept, "shell") is True, repr(text)
+        assert _model(upper, "portable") is None, repr(text)
+        assert _model(kept, "shell") is None, repr(text)
         assert kept.upper() == upper
         assert sanitize_env_name(upper) == upper
         prefixed = sanitize_env_name(text, prefix="APP_")
