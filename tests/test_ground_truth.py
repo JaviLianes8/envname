@@ -113,3 +113,33 @@ def test_environ_rules_match_the_operating_system() -> None:
         assert all(name.startswith("=") and "=" not in name[1:] for name in stricter)
     else:
         assert stricter == []
+
+
+PUTENV_PROBE = """
+import json, os, sys
+out = []
+for name in json.load(sys.stdin):
+    try:
+        os.putenv(name, "v")
+    except (ValueError, OSError):
+        out.append(False)
+    else:
+        out.append(True)
+print(json.dumps(out))
+"""
+
+
+def test_environ_rules_match_python_putenv() -> None:
+    # CPython refuses an empty name, "=" anywhere (Windows refuses a leading "=" too,
+    # through its C runtime) and NUL; the environ rule set says the same.
+    names = [*_corpus(), "A\x00B", "\x00", "=", "=="]
+    result = subprocess.run(
+        [sys.executable, "-I", "-c", PUTENV_PROBE],
+        input=json.dumps(names),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    verdicts = json.loads(result.stdout)
+    for name, accepted in zip(names, verdicts, strict=True):
+        assert is_valid_env_name(name, rules="environ") == accepted, repr(name)
