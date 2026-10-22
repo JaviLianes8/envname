@@ -16,6 +16,7 @@ Progress:
 - [x] Packaging, e2e, every Python (items 8, 10, 13, 14)
 - [x] Gates (item 15)
 - [x] PR #3 and trace guard CLEAN
+- [x] QA lenses round 1: every finding fixed at 7b0ddad (none disputed)
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer reports PASS (item 16)
 
@@ -25,9 +26,9 @@ Progress:
 | --- | --- | --- |
 | 1 | Public API reviewed for stability | PASS: 5 names; `sanitize_env_name(text, ...)` renamed from `s`; signatures pinned by `tests/test_contract_api.py` |
 | 2 | `__all__` exact, no private imports in docs | PASS |
-| 3 | Docstrings with runnable examples, doctests | PASS: 5 doctests in the package, README (16 outputs, 3 commands) and GUIDE (14 examples) run as tests |
+| 3 | Docstrings with runnable examples, doctests | PASS: 5 doctests in the package, README (16 outputs, 3 commands) and GUIDE (15 examples) run as tests |
 | 4 | Typed end to end | PASS: `mypy --strict src tests`, `py.typed`, typing checked from a consumer snippet |
-| 5 | Typed, documented, bounded errors | PASS: `InvalidEnvName` (a `ValueError`), `TypeError`, `ValueError`; messages quote at most 60 characters |
+| 5 | Typed, documented, bounded errors | PASS: `InvalidEnvName` (a `ValueError`), `TypeError`, `ValueError`; messages and `repr` quote at most 60 characters and nothing from the first `=` on (QA round 1) |
 | 6 | Contract tests of every public name | PASS |
 | 7 | Real ground truth | PASS: 13 fetched sources with a hash manifest; bash, the OS call, `os.putenv`, python-dotenv run live |
 | 8 | Real e2e from the wheel | PASS: sdist and wheel built and inspected, wheel installed in a fresh venv, API and CLI driven from an empty folder; no PyPI release to upgrade from |
@@ -176,7 +177,44 @@ and `pytest` (211 passed) all exit 0.
 
 ## QA lenses (item 19)
 
-Pending.
+### Round 1 (reviewed 68a6f91, fixed in 7b0ddad)
+
+Five lenses: (a) API and docs, (b) correctness and ground truth, (c) adversarial, (d)
+packaging and e2e, (e) contract strength. Lens (b) found the library itself agreeing with
+every oracle (0 mismatches on over 4 million cases); its one finding was in the README.
+Every finding below is fixed; none is disputed. Behaviour fixes were first pinned by a
+contract test that failed on 68a6f91.
+
+| Lens | Finding | Severity | Fix |
+| --- | --- | --- | --- |
+| c | F1: `sanitize_env_name` quadratic on long runs of combining marks and on repeated U+FDFA (whole-text NFKD) | high | `_fold_to_ascii` folds one character at a time (cached), ASCII text skips it; same names, checked against whole-text NFKD on 5,000 mark-heavy texts. `test_fuzz.py` gains the "mixed marks" and "long decomposition" shapes. Before: 10k to 40k characters took 17x and 12x longer; after: 3x and 4x |
+| c | F2: messages echo what follows `=` (often a secret), also through the CLI and `prefix` | medium | `_quote` stops before the first `=` and gives the length; `tests/test_messages.py` |
+| c | F3: `repr(InvalidEnvName)` holds the whole name | low | `__repr__` quotes the name like the message; pickling keeps the whole name |
+| c | F4: CLI repeats an invalid `--rules` value in full | low | `--rules` is checked by a `type=` function with a bounded message; every usage error is cut at 300 characters (unknown command, unrecognised argument too) |
+| c, d | F5 / F1: `envname sanitize` traceback when stdout's reader goes away | low | caught (EPIPE, and EINVAL on Windows), stdout pointed at the null device, exit 141; in-process test and a subprocess test with a closed pipe |
+| c | F6: `upper` used as a truth value (`"false"` upper-cased) | low | `TypeError: upper must be bool, not ...`, never calls `__bool__` |
+| a, d, e | A1 / F2 / F9: documented `fetch_upstream.py` exits 1 (the Microsoft Learn page is served with per-client CDN additions); the Bash manual was pinned the same mutable way | low | the Windows source is the page's markdown at MicrosoftDocs/win32 commit 3aee48a; the Bash manual is `doc/bashref.html` from the bash 5.3 release archive (archive and member both hashed); `tests/test_fetch_upstream.py` pins the script offline and that every source names a fixed revision. A fresh clone of 7b0ddad: fetch exits 0, `test_spec_sources.py` 8 passed, none skipped |
+| a | A2: GUIDE message format ignored `index=None` | low | reworded; also documents the `=` cut and the `repr` |
+| a | A3: CONTRIBUTING's "never touch the real thing" had unlisted exceptions | low | rule reworded; every test that runs a real program or writes under `tmp_path` is listed |
+| a | A4: CHANGELOG 0.1.0 and 0.2.0 undated, no change-type heading, no link definitions | low | dated from git (eb89a38 2026-10-11, 4583912 2026-10-12), `### Added` under 0.1.0, link definitions as in the sibling libraries |
+| b | F1: README's Windows length bullet was wrong (the `=` counts; `SetEnvironmentVariableW` stores longer names) | low | reworded to the observed limits; `test_docs.py::test_the_windows_length_limits_are_as_stated` checks them in a child process on Windows (reproduced here on CPython 3.13.2) |
+| e | F1 to F8: surviving mutants (underscore runs collapsed, text stripped, output cut at 255, Mc marks dropped, `check`/`sanitize` without arguments, CLI upper-casing the prefix, error holding a `str` subclass) | medium, low | contracts added: `__init__`, `a__b`, `a_-_b`, ` db host `, `	PATH
+`, `a` * 300 (both cases), U+093E and U+0903, missing `NAME` and `TEXT` exit 2, `--keep-case --prefix app_`, `type(error.name) is str` for a `str` subclass with its own `__str__` |
+
+Behaviour changes recorded in the CHANGELOG 1.0.0 section: messages and `repr` stop
+before `=`, `upper` must be a `bool`, exit 141 on a closed pipe, bounded usage errors,
+and the linear-time fix.
+
+Verification at 7b0ddad:
+
+- This PC, a clean export with the fetched sources, Git's `bash` and python-dotenv, one
+  interpreter at a time: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2
+  free-threaded each 248 passed, 3 skipped (the opt-in wheel e2e).
+- Another machine, CPython 3.14.2, with `ENVNAME_E2E=1`: `ruff format --check .`,
+  `ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest` each exit 0;
+  250 passed, 1 skipped (no `bash` there).
+
+Round 2 verdicts: pending.
 
 ## Independent review (item 16)
 
