@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import errno
 import os
 import sys
 from collections.abc import Sequence
-from typing import NoReturn
+from typing import TYPE_CHECKING, NoReturn
 
 from ._rules import RULES, InvalidEnvName, _quote, _require_rules, check_env_name
 from ._sanitize import sanitize_env_name
+
+if TYPE_CHECKING:
+    from _typeshed import SupportsWrite
 
 # 128 + SIGPIPE: the status a shell reports for a writer whose reader went away.
 READER_GONE = 141
@@ -19,10 +23,21 @@ _LONGEST_ERROR = 300
 
 class _Parser(argparse.ArgumentParser):
     def error(self, message: str) -> NoReturn:
+        if sys.stderr is None:
+            # argparse would print the usage on stdout, where it would pass for a name.
+            self.exit(2)
         # argparse repeats the offending argument, which can be as long as the OS allows.
         if len(message) > _LONGEST_ERROR:
             message = f"{message[:_LONGEST_ERROR]}... ({len(message)} characters)"
         super().error(message)
+
+    def _print_message(self, message: str, file: SupportsWrite[str] | None = None) -> None:
+        # Python 3.10 writes to a missing stream (pythonw, `2>&-`) and dies with
+        # AttributeError, turning exit 2 or 0 into 1; 3.11+ skips the write, as here.
+        file = file or sys.stderr
+        if message and file is not None:
+            with contextlib.suppress(OSError):
+                file.write(message)
 
 
 def _rules(value: str) -> str:
@@ -57,6 +72,9 @@ def _warn(message: str) -> None:
     # A name can hold characters the console encoding cannot show (cp1252 on Windows);
     # escaping them beats crashing halfway through the report.
     stream = sys.stderr
+    if stream is None:
+        # Started without a stderr (pythonw, `2>&-`): the exit status still reports it.
+        return
     encoding = getattr(stream, "encoding", None) or "utf-8"
     stream.write(message.encode(encoding, "backslashreplace").decode(encoding) + "\n")
 

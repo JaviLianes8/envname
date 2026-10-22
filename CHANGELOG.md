@@ -33,6 +33,11 @@ attributes, and the command line with its exit codes.
   away early (`| head -1`); in 0.2.0 it printed a traceback and exited 1 or 120. Any
   other write error, such as a full disk, still propagates, and a process started
   without a stdout (`>&-`, `pythonw`) prints nothing and exits 0, as in 0.2.0.
+- A command line started without a stderr (`2>&-`, `pythonw`) keeps its exit status
+  and writes nothing there. In 0.2.0 `envname check` with an invalid name raised
+  `AttributeError` from `main()` (the process still exited 1, with the traceback
+  lost), and a usage error printed its usage line on stdout instead, and on
+  Python 3.10 exited 1 instead of 2.
 - Command line usage errors quote at most 300 characters of the offending argument,
   and an unknown `--rules` value at most 60. In 0.2.0 argparse repeated it in full.
 - The public objects report `envname` as their module, so a pickled `InvalidEnvName`

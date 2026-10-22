@@ -186,6 +186,8 @@ envname --version
   `--prefix`) exits 2 with a usage message on stderr. A message longer than 300
   characters is cut at 300 and followed by its length, and an unknown `--rules` value is
   quoted like a name in an error: at most 60 characters, never past its first `=`.
+- Started without a stderr (`2>&-`, `pythonw`), every command keeps the exit status
+  above and prints no message, not even a usage line on stdout.
 - Put `--` before a name that starts with `-`.
 
 ## Stability
