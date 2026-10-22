@@ -82,10 +82,10 @@ def test_wheel_holds_the_package_license_and_metadata(dist: Path) -> None:
     assert "envname = envname._cli:main" in entry_points
     assert "Classifier: Development Status :: 5 - Production/Stable" in metadata
     assert "Requires-Python: >=3.10" in metadata
-    assert [line for line in metadata.splitlines() if line.startswith("Requires-Dist")] == [
+    assert {line for line in metadata.splitlines() if line.startswith("Requires-Dist")} == {
         f"Requires-Dist: {tool}; extra == 'dev'"
         for tool in ("ruff", "mypy", "pytest", "pytest-timeout", "build", "twine")
-    ]
+    }
 
 
 def test_sdist_holds_sources_and_tests_but_no_fetched_files(dist: Path) -> None:

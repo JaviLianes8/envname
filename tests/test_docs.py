@@ -127,7 +127,8 @@ def test_the_why_section_states_facts() -> None:
     assert "\u00e9t\u00e9".isidentifier() and "\ufb01le".isidentifier()
     assert not is_valid_env_name("\u00e9t\u00e9") and not is_valid_env_name("\ufb01le")
     assert string.Template.idpattern == r"(?a:[_a-z][_a-z0-9]*)"
-    assert string.Template.flags == re.IGNORECASE
+    # Python 3.14 leaves Template.flags as None and applies IGNORECASE by default.
+    assert string.Template.pattern.flags & re.IGNORECASE
     assert "`(?a:[_a-z][_a-z0-9]*)` with `re.IGNORECASE`" in _readme()
     accepted = subprocess.run(
         [sys.executable, "-I", "-c", "import os; os.putenv('my-var', 'v')"], check=False
