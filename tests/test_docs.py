@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import doctest
 import re
 import shlex
+import string
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 import envname
+from envname import is_valid_env_name
 from envname._cli import main
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -98,3 +103,34 @@ def test_the_rules_table_lists_every_rule_set() -> None:
 
     rows = re.findall(r'^\| `"(\w+)"`', _readme(), flags=re.MULTILINE)
     assert rows == list(RULES)
+
+
+def test_every_guide_example_runs() -> None:
+    text = (ROOT / "GUIDE.md").read_text(encoding="utf-8")
+    blocks = re.findall(r"```pycon\n(.*?)```", text, flags=re.DOTALL)
+    assert len(blocks) == 5
+    parser = doctest.DocTestParser()
+    runner = doctest.DocTestRunner(optionflags=doctest.ELLIPSIS)
+    # The blocks read as one session: later blocks use names imported earlier.
+    session: dict[str, object] = {}
+    for number, block in enumerate(blocks):
+        test = parser.get_doctest(block, session, f"GUIDE.md block {number}", "GUIDE.md", 0)
+        assert test.examples, number
+        runner.run(test, clear_globs=False)
+        session.update(test.globs)
+    results = runner.summarize(verbose=False)
+    assert results.failed == 0 and results.attempted == 14
+
+
+def test_the_why_section_states_facts() -> None:
+    # Each claim the README makes about another tool, run here.
+    assert "\u00e9t\u00e9".isidentifier() and "\ufb01le".isidentifier()
+    assert not is_valid_env_name("\u00e9t\u00e9") and not is_valid_env_name("\ufb01le")
+    assert string.Template.idpattern == r"(?a:[_a-z][_a-z0-9]*)"
+    assert string.Template.flags == re.IGNORECASE
+    assert "`(?a:[_a-z][_a-z0-9]*)` with `re.IGNORECASE`" in _readme()
+    accepted = subprocess.run(
+        [sys.executable, "-I", "-c", "import os; os.putenv('my-var', 'v')"], check=False
+    )
+    assert accepted.returncode == 0 and not is_valid_env_name("my-var")
+    assert is_valid_env_name("ProgramFiles(x86)", rules="environ")

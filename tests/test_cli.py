@@ -90,3 +90,12 @@ def test_runs_as_a_module() -> None:
     )
     assert result.returncode == 1
     assert "'-x': '-' is not allowed at index 0" in result.stderr
+
+
+def test_version_prints_the_package_version(capsys: pytest.CaptureFixture[str]) -> None:
+    from envname import __version__
+
+    with pytest.raises(SystemExit) as caught:
+        main(["--version"])
+    assert caught.value.code == 0
+    assert capsys.readouterr().out == f"envname {__version__}\n"
