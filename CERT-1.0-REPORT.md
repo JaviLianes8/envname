@@ -3,25 +3,181 @@
 The 1.0.0 certification bar (19 items) applied to envname. Nothing is on PyPI yet
 (`https://pypi.org/pypi/envname/json` answered 404 on 2026-10-22, and so did the
 similar names `env-name`, `env_name` and `env.name`), so 1.0.0 is the first upload and
-there is no upgrade path to check. Every change is still listed in the CHANGELOG.
+there is no release to upgrade from. Every change against 0.2.0 is still in the CHANGELOG.
 
 Progress:
 - [x] Branch `release/1.0.0` created from `main` (4583912, version 0.2.0)
 - [x] Baseline gates on 0.2.0
 - [x] API review and 1.0.0 changes (item 1)
-- [ ] Errors, typing, docstrings and doctests (items 2 to 5)
-- [ ] Ground truth: fetched specifications, Unicode data, real programs (item 7)
-- [ ] Contract, fuzz and author mutation round (items 6, 9, 18)
-- [ ] Docs: README, GUIDE, CHANGELOG (items 11, 12)
-- [ ] Packaging, e2e, every Python (items 8, 10, 13, 14)
-- [ ] Gates (item 15)
-- [ ] PR and trace guard
+- [x] Errors, typing, docstrings and doctests (items 2 to 5)
+- [x] Ground truth: fetched specifications, Unicode data, real programs (item 7)
+- [x] Contract, fuzz and author mutation round (items 6, 9, 18)
+- [x] Docs: README, GUIDE, CHANGELOG (items 11, 12)
+- [x] Packaging, e2e, every Python (items 8, 10, 13, 14)
+- [x] Gates (item 15)
+- [x] PR and trace guard
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer reports PASS (item 16)
 
+## Scorecard
+
+| # | Item | Result |
+| --- | --- | --- |
+| 1 | Public API reviewed for stability | PASS: 5 names; `sanitize_env_name(text, ...)` renamed from `s`; signatures pinned by `tests/test_contract_api.py` |
+| 2 | `__all__` exact, no private imports in docs | PASS |
+| 3 | Docstrings with runnable examples, doctests | PASS: 5 doctests in the package, README (16 outputs, 3 commands) and GUIDE (14 examples) run as tests |
+| 4 | Typed end to end | PASS: `mypy --strict src tests`, `py.typed`, typing checked from a consumer snippet |
+| 5 | Typed, documented, bounded errors | PASS: `InvalidEnvName` (a `ValueError`), `TypeError`, `ValueError`; messages quote at most 60 characters |
+| 6 | Contract tests of every public name | PASS |
+| 7 | Real ground truth | PASS: 13 fetched sources with a hash manifest; bash, the OS call, `os.putenv`, python-dotenv run live |
+| 8 | Real e2e from the wheel | PASS: sdist and wheel built and inspected, wheel installed in a fresh venv, API and CLI driven from an empty folder; no PyPI release to upgrade from |
+| 9 | Seeded fuzz, no crash, hang or blowup | PASS |
+| 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2, 3.14.2t |
+| 11 | README and `twine check` | PASS: `twine check --strict`, absolute links |
+| 12 | Dated CHANGELOG section | PASS: 1.0.0, 2026-10-22 |
+| 13 | pyproject 1.0.0, Production/Stable | PASS |
+| 14 | sdist and wheel contents | PASS |
+| 15 | Gates each exit 0 | PASS: see Gates |
+| 16 | Independent reviewer | pending |
+| 17 | PR and trace guard | PR from `release/1.0.0`, trace guard CLEAN; merge and publish left to the maintainer |
+| 18 | Contracts bite (mutations) | PASS: author round 32 mutants, 32 killed after two contracts were added |
+| 19 | Five independent QA lenses | pending |
+
 ## Baseline on 0.2.0 (before any change)
 
-Fresh clone of `release/1.0.0` at 4583912 on another machine, CPython 3.14.2:
-`ruff format --check .`, `ruff check .` and `mypy --strict src tests` exit 0; `pytest`
-141 passed, 2 skipped (the installed-wheel test, which needs `ENVNAME_E2E=1`, and the
-bash ground truth, as that machine has no `bash` on its `PATH`).
+Fresh clone at 4583912 on another machine, CPython 3.14.2: `ruff format --check .`,
+`ruff check .` and `mypy --strict src tests` exit 0; `pytest` 141 passed, 2 skipped (the
+installed-wheel test, which needs `ENVNAME_E2E=1`, and the bash ground truth, as that
+machine has no `bash` on its `PATH`).
+
+Gaps found in 0.2.0 by running it: an `InvalidEnvName` message quoted the whole name (a
+1 MB name gave a 1 MB message); an unknown `rules` object was shown with its `repr`
+(which can be huge or raise); the first parameter of `sanitize_env_name` was called `s`;
+pickles and tracebacks named the private module `envname._rules`; no docstring had an
+example; README links to LICENSE were relative; there was no guide, no fuzzing beyond
+the sanitizer, and no fetched source behind the rule sets.
+
+## API review (item 1)
+
+Kept: `is_valid_env_name(name, *, rules="shell")`, `check_env_name(name, *,
+rules="shell")`, `InvalidEnvName(name, rules, reason, index=None)` with its four
+attributes, the `Rules` literal and the command line. Changed, all in the CHANGELOG:
+`sanitize_env_name(text, *, upper=True, prefix="")` (was `s`), bounded messages, unknown
+rules named by type, public objects report the module `envname`. Added: `envname
+--version`. The GUIDE states the stability promise (the wording of reasons may improve;
+the attributes are stable).
+
+## Ground truth (item 7)
+
+Fetched on 2026-10-22 by `scripts/fetch_upstream.py` into the ignored `tests/upstream`
+folder; `tests/upstream/MANIFEST.json` records URL, revision, size, sha256 and licence,
+and the tests check the hash before reading. Nothing fetched is committed or shipped.
+
+- POSIX.1-2024 XBD chapters 3, 6 and 8 and XSH `setenv` (`tests/test_spec_sources.py`):
+  the 3.216 Name and 8.1 utility-name sentences are cut from the text; the letter, digit
+  and underscore classes are read from the 6.1 Portable Character Set table (by the
+  character descriptions) and compared with both rule sets on every code point up to
+  U+02FF plus separators, a surrogate, full-width and astral characters, in first and
+  later position; all 24 variables defined in chapter 8 and the 77 names of its "unwise
+  to conflict" table are `portable`; the `=`, empty and NUL rules for `environ` are tied
+  to the XBD 8.1, `setenv` and Windows sentences.
+- Bash manual: the `name` definition is cut from the text.
+- Unicode Character Database 13.0.0 to 16.0.0 (`tests/test_unicode_data.py`): for the
+  version of the running Python, the expected sanitized form of every assigned code
+  point, every range boundary and every 251st code point (over 30,000 characters) is
+  rebuilt from the decomposition mappings and general categories in `UnicodeData.txt`,
+  independently of `unicodedata`; every mark between two letters is dropped.
+- Real programs: `bash` (`unset -v` on 1,000+ generated names, one shell), the call that
+  stores a variable (`SetEnvironmentVariableW` on Windows, `setenv` on POSIX) and
+  `os.putenv` agree with `shell` and `environ` (`tests/test_ground_truth.py`);
+  python-dotenv 1.1.1 is run on the generated keys and matches the `_unquoted_key`
+  pattern read from its fetched `parser.py`; the Compose pattern is read from
+  compose-go `template.go` (`tests/test_oracles.py`). The README's "Why" claims run in
+  `tests/test_docs.py`.
+
+## Fuzz and hostile input (item 9)
+
+`tests/test_fuzz.py`: three seeds of 4,000 names per rule set over ASCII, separators,
+NUL, non-ASCII letters and digits, marks, surrogates and astral characters, compared
+with a character-by-character model of each grammar (validity, reason and index all
+agree; every message at most 800 characters); three seeds of 4,000 texts for the
+sanitizer (valid, stable, prefix law); eight input shapes timed at 20,000 and 200,000
+characters through all three rule sets and the sanitizer (linear). A 1,000,001-character
+name gives a message under 200 characters (`tests/test_contract_api.py`).
+
+## Author mutation round (item 18)
+
+32 mutants over every module, each applied alone to a clean checkout of 7d1bbd2 on
+another machine (fetched sources, Git's `bash` and python-dotenv present, bytecode
+writing off), the suite run with `-x` and a 300 s per-test limit. The first run at
+7e2841e left two survivors, M08 and M14; the contracts in 7d1bbd2 (non-ASCII leading
+digits in `tests/test_check.py` and every reason in the fuzz model; rules given as a
+`str` subclass) kill both. Final run: 32 of 32 killed.
+
+| Mutant | Module | Change | Killed by |
+| --- | --- | --- | --- |
+| M01 | `_rules.py` | shell accepts a leading digit | doctest `envname.is_valid_env_name` |
+| M02 | `_rules.py` | shell drops `_` after the first character | doctest `envname.check_env_name` |
+| M03 | `_rules.py` | portable accepts a lower-case first letter | `test_fuzz.py::test_every_name_agrees_with_the_model[portable-20261022]` |
+| M04 | `_rules.py` | environ accepts NUL | `test_docs.py::test_every_guide_example_runs` |
+| M05 | `_rules.py` | environ accepts an empty name | `test_check.py::test_reports_reason_and_first_offending_index[-environ-...]` |
+| M06 | `_rules.py` | `is_valid_env_name` matches a prefix only | `test_docs.py::test_every_python_example_prints_the_transcript` |
+| M07 | `_rules.py` | offending index off by one | doctest `envname.check_env_name` |
+| M08 | `_rules.py` | leading digit tested with `str.isdigit` | `test_check.py::test_reports_reason_and_first_offending_index[\u0663A-shell-...]` |
+| M09 | `_rules.py` | empty name reports index 0 | `test_check.py::test_reports_reason_and_first_offending_index[-shell-...]` |
+| M10 | `_rules.py` | environ reasons swapped | `test_check.py::test_reports_reason_and_first_offending_index[KEY=VALUE-environ-...]` |
+| M11 | `_rules.py` | non-ASCII lower case called "not portable" | `test_check.py::test_reports_reason_and_first_offending_index[A\xe9-portable-...]` |
+| M12 | `_rules.py` | quote limit off by one | `test_contract_api.py::test_messages_quote_at_most_sixty_characters` |
+| M13 | `_rules.py` | message quotes the whole name | `test_contract_api.py::test_messages_quote_at_most_sixty_characters` |
+| M14 | `_rules.py` | rules kept as the caller's `str` subclass | `test_check.py::test_rules_given_as_a_str_subclass_are_stored_as_exact_str` |
+| M15 | `_rules.py` | name not copied to an exact `str` | `test_check.py::test_str_subclass_cannot_make_the_explanation_disagree` |
+| M16 | `_rules.py` | `ValueError` instead of `TypeError` for a non-string | `test_check.py::test_non_string_raises_type_error` |
+| M17 | `_rules.py` | error args do not match `__init__` | `test_contract_api.py::test_error_is_a_value_error_with_its_fields` |
+| M18 | `_rules.py` | message drops the index | doctest `envname.check_env_name` |
+| M19 | `_rules.py` | unknown rules object shown with `repr` | `test_contract_api.py::test_unknown_rules_raise_value_error_naming_them_safely[None-NoneType]` |
+| M20 | `_sanitize.py` | enclosing marks kept | `test_sanitize.py::test_sanitizes[x\u20ddy-XY]` |
+| M21 | `_sanitize.py` | NFD instead of NFKD | `test_sanitize.py::test_sanitizes[\ufb01le-FILE]` |
+| M22 | `_sanitize.py` | runs not collapsed | `test_docs.py::test_every_python_example_prints_the_transcript` |
+| M23 | `_sanitize.py` | leading digit not guarded | doctest `envname.sanitize_env_name` |
+| M24 | `_sanitize.py` | `upper` inverted | doctest `envname.sanitize_env_name` |
+| M25 | `_sanitize.py` | prefix not validated | `test_cli.py::test_sanitize_rejects_an_invalid_prefix` |
+| M26 | `_sanitize.py` | prefix appended | doctest `envname.sanitize_env_name` |
+| M27 | `_cli.py` | `check` exits 0 on invalid names | `test_cli.py::test_check_reports_every_invalid_name_and_exits_one` |
+| M28 | `_cli.py` | `check` stops at the first invalid name | `test_cli.py::test_check_reports_every_invalid_name_and_exits_one` |
+| M29 | `_cli.py` | `--keep-case` inverted | `test_cli.py::test_sanitize_prints_one_name_per_text` |
+| M30 | `_cli.py` | unprintable names crash the report | `test_cli.py::test_check_escapes_what_the_console_cannot_show` |
+| M31 | `_cli.py` | default rule set `portable` | `test_cli.py::test_check_exits_zero_when_every_name_is_valid` |
+| M32 | `__init__.py` | public objects report the private module | `test_contract_api.py::test_public_objects_live_in_the_package` |
+
+## Packaging, e2e and Pythons (items 8, 10, 13, 14)
+
+- Full suite at 7d1bbd2 on another machine from a fresh clone, with the fetched sources,
+  Git's `bash`, python-dotenv and `ENVNAME_E2E=1`: 211 passed, no skips. The e2e tests
+  build the sdist and wheel, check their file lists and metadata, install the wheel in a
+  fresh venv and drive the API with `-I` and the console script and `python -m envname`
+  from an empty folder.
+- Wheel: the six package files plus `METADATA`, `WHEEL`, `RECORD`, `entry_points.txt`
+  and `licenses/LICENSE`. Sdist: sources, tests, scripts, docs, LICENSE and the manifest;
+  no fetched file, no `CERT-1.0-*`, no `IMPROVEMENTS-round*`, no caches.
+  `twine check --strict` passes on both.
+- Every interpreter on this PC from `requires-python` up, at 7e2841e (code identical to
+  7d1bbd2): the wheel installed in a fresh venv and the sdist's own suite run with `src`
+  removed (fetched sources, Git's `bash` and python-dotenv present), package doctests
+  included: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2 free-threaded,
+  205 passed and 3 skipped each (the e2e tests, which run separately). 3.8 and 3.9 are
+  below `requires-python`.
+
+## Gates (item 15)
+
+At 7d1bbd2 on another machine, from a clean checkout with the fetched sources, Git's
+`bash`, python-dotenv and `ENVNAME_E2E=1`, each command on its own:
+`ruff format --check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests`
+and `pytest` (211 passed) all exit 0.
+
+## QA lenses (item 19)
+
+Pending.
+
+## Independent review (item 16)
+
+Pending.
