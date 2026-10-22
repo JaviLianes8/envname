@@ -5,6 +5,7 @@ The downloads are injected: these tests never touch the network.
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 import importlib.util
 import io
@@ -111,3 +112,51 @@ def test_every_source_names_a_fixed_revision() -> None:
         for field in ("url", "licence", "fetched", "size", "sha256"):
             assert entry[field], (name, field)
         assert ("member" in entry) == ("archive_sha256" in entry), name
+
+
+def test_refuses_bytes_of_the_pinned_size_with_another_sha256(
+    served: dict[str, bytes], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    served["https://a/page"] = b"pagf"
+    _manifest(tmp_path, {"page.txt": {"url": "https://a/page", **_pin(b"page")}})
+    assert _script_module.main([], tmp_path) == 1
+    assert not (tmp_path / "page.txt").exists()
+    assert "page.txt: got 4 bytes" in capsys.readouterr().out
+
+
+def test_update_saves_the_files_and_records_their_new_pins(
+    served: dict[str, bytes], tmp_path: Path
+) -> None:
+    archive = _tar("pkg/doc.html", b"new manual")
+    served.update({"https://a/page": b"new page bytes", "https://a/pkg.tar.gz": archive})
+    stale = {"size": 1, "sha256": "0", "fetched": "2000-01-01"}
+    _manifest(
+        tmp_path,
+        {
+            "page.txt": {"url": "https://a/page", **stale},
+            "doc.html": {
+                "url": "https://a/pkg.tar.gz",
+                "member": "pkg/doc.html",
+                "archive_size": 1,
+                "archive_sha256": "0",
+                **stale,
+            },
+        },
+    )
+    before = datetime.date.today().isoformat()
+    assert _script_module.main(["--update"], tmp_path) == 0
+    after = datetime.date.today().isoformat()
+    assert (tmp_path / "page.txt").read_bytes() == b"new page bytes"
+    assert (tmp_path / "doc.html").read_bytes() == b"new manual"
+    manifest = json.loads((tmp_path / "MANIFEST.json").read_text(encoding="utf-8"))
+    for entry in manifest.values():
+        assert entry.pop("fetched") in (before, after)
+    assert manifest == {
+        "page.txt": {"url": "https://a/page", **_pin(b"new page bytes")},
+        "doc.html": {
+            "url": "https://a/pkg.tar.gz",
+            "member": "pkg/doc.html",
+            **_pin(archive, "archive_"),
+            **_pin(b"new manual"),
+        },
+    }

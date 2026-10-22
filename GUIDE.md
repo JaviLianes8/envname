@@ -179,10 +179,13 @@ envname --version
   console cannot show are escaped rather than crashing the report.
 - `sanitize` prints one name per `TEXT` on stdout and exits 0. When the reader of its
   output goes away early, as in `envname sanitize ... | head -1`, it stops quietly and
-  exits 141, the status a shell gives a program stopped by a closed pipe.
+  exits 141, the status a shell gives a program stopped by a closed pipe. Any other
+  write error, such as a full disk, is not hidden. Started without a stdout at all
+  (`>&-`, `pythonw`), it prints nothing and exits 0.
 - A usage error (an unknown option or rule set, a missing argument, an invalid
-  `--prefix`) exits 2 with a usage message on stderr. The message quotes at most 300
-  characters of what it complains about.
+  `--prefix`) exits 2 with a usage message on stderr. A message longer than 300
+  characters is cut at 300 and followed by its length, and an unknown `--rules` value is
+  quoted like a name in an error: at most 60 characters, never past its first `=`.
 - Put `--` before a name that starts with `-`.
 
 ## Stability

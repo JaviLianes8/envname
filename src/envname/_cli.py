@@ -62,6 +62,9 @@ def _warn(message: str) -> None:
 
 
 def _print_lines(lines: list[str]) -> int:
+    if sys.stdout is None:
+        # Started without a stdout at all (pythonw, `>&-`): print() would drop the lines too.
+        return 0
     try:
         for line in lines:
             print(line)

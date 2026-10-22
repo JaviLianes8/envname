@@ -30,7 +30,9 @@ attributes, and the command line with its exit codes.
 - `sanitize_env_name` raises `TypeError` when `upper` is not a `bool`. In 0.2.0 any
   object was used for its truth value, so `upper="false"` upper-cased the name.
 - `envname sanitize` exits 141 without a traceback when the reader of its output goes
-  away early (`| head -1`); in 0.2.0 it printed a traceback and exited 1 or 120.
+  away early (`| head -1`); in 0.2.0 it printed a traceback and exited 1 or 120. Any
+  other write error, such as a full disk, still propagates, and a process started
+  without a stdout (`>&-`, `pythonw`) prints nothing and exits 0, as in 0.2.0.
 - Command line usage errors quote at most 300 characters of the offending argument,
   and an unknown `--rules` value at most 60. In 0.2.0 argparse repeated it in full.
 - The public objects report `envname` as their module, so a pickled `InvalidEnvName`
@@ -39,8 +41,8 @@ attributes, and the command line with its exit codes.
 ### Fixed
 
 - `sanitize_env_name` takes time in proportion to the length of the text. In 0.2.0 a
-  long run of combining marks (zalgo text) or a repeated U+FDFA took quadratic time:
-  over 30 seconds for 200,000 characters. The names it returns are unchanged.
+  long run of combining marks (zalgo text) or a repeated U+FDFA took time that grew
+  with the square of its length. The names it returns are unchanged.
 
 ### Added
 

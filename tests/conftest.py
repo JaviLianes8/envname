@@ -6,11 +6,21 @@ import hashlib
 import html
 import json
 import re
+import shutil
 from pathlib import Path
 
 import pytest
 
 UPSTREAM = Path(__file__).resolve().parent / "upstream"
+
+
+def find_bash() -> str | None:
+    """Return the path of a real bash, or None."""
+    found = shutil.which("bash")
+    # On Windows "bash" may be the WSL launcher in System32, which is not a shell here.
+    if found is None or "system32" in found.lower():
+        return None
+    return found
 
 
 def upstream_bytes(name: str) -> bytes:

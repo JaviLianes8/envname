@@ -88,6 +88,13 @@ def test_repr_is_as_short_as_the_message() -> None:
     assert repr(InvalidEnvName("1A", "shell", "it starts with a digit", 0)) == (
         "InvalidEnvName('1A', 'shell', 'it starts with a digit', 0)"
     )
+
+    class Mine(InvalidEnvName):
+        pass
+
+    assert repr(Mine("1A", "shell", "it starts with a digit", 0)) == (
+        "Mine('1A', 'shell', 'it starts with a digit', 0)"
+    )
     # The whole name still travels with the error, through pickling too.
     again = pickle.loads(pickle.dumps(error))
     assert again.name == error.name and repr(again) == repr(error)
