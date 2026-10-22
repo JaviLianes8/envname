@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import random
+import re
+import unicodedata
 
 import pytest
 
@@ -27,6 +29,14 @@ from envname import InvalidEnvName, check_env_name, is_valid_env_name, sanitize_
         ("PATH", "PATH"),
         ("a\u034fb", "AB"),
         ("x\u20ddy", "XY"),
+        ("__init__", "__INIT__"),
+        ("a__b", "A__B"),
+        ("a_-_b", "A___B"),
+        (" db host ", "_DB_HOST_"),
+        ("\tPATH\n", "_PATH_"),
+        ("ka\u093e", "KA_"),
+        ("x\u0903y", "X_Y"),
+        ("a" * 300, "A" * 300),
     ],
 )
 def test_sanitizes(raw: str, expected: str) -> None:
@@ -54,9 +64,9 @@ def test_invalid_prefix_is_rejected(prefix: str) -> None:
         sanitize_env_name("x", prefix=prefix)
 
 
-@pytest.mark.parametrize(("arg", "value"), [("s", None), ("s", b"x"), ("prefix", None)])
+@pytest.mark.parametrize(("arg", "value"), [("text", None), ("text", b"x"), ("prefix", None)])
 def test_non_string_input_raises_type_error(arg: str, value: object) -> None:
-    kwargs: dict[str, object] = {"s": "x", arg: value}
+    kwargs: dict[str, object] = {"text": "x", arg: value}
     with pytest.raises(TypeError, match=f"{arg} must be str"):
         sanitize_env_name(**kwargs)  # type: ignore[arg-type]
 
@@ -95,3 +105,47 @@ def test_valid_names_pass_through_unchanged() -> None:
     for name in ["PATH", "_X", "LC_ALL", "A1_B2"]:
         assert sanitize_env_name(name) == name
         assert sanitize_env_name(name.lower(), upper=False) == name.lower()
+
+
+def test_long_output_keeps_every_character() -> None:
+    assert sanitize_env_name("a" * 300, upper=False) == "a" * 300
+    assert sanitize_env_name("-" + "b" * 299, prefix="P", upper=False) == "P_" + "b" * 299
+
+
+@pytest.mark.parametrize("upper", ["false", "", None, 0, 1])
+def test_upper_must_be_a_bool(upper: object) -> None:
+    with pytest.raises(TypeError) as caught:
+        sanitize_env_name("abc", upper=upper)  # type: ignore[arg-type]
+    assert str(caught.value) == f"upper must be bool, not {type(upper).__name__}"
+
+
+def test_upper_is_never_asked_for_its_truth_value() -> None:
+    class Boom:
+        def __bool__(self) -> bool:
+            raise RuntimeError("bool boom")
+
+    with pytest.raises(TypeError, match="upper must be bool, not Boom"):
+        sanitize_env_name("abc", upper=Boom())  # type: ignore[arg-type]
+
+
+def _whole_string_fold(text: str, upper: bool) -> str:
+    # The reference: NFKD of the whole text at once, then the same steps.
+    kept = "".join(
+        c
+        for c in unicodedata.normalize("NFKD", text)
+        if unicodedata.category(c) not in ("Mn", "Me")
+    )
+    name = re.sub(r"[^A-Za-z0-9_]+", "_", kept)
+    name = "_" + name if not name or name[0].isdigit() else name
+    return name.upper() if upper else name
+
+
+def test_folding_agrees_with_normalizing_the_whole_text() -> None:
+    # Combining marks of different classes in one run are reordered by NFKD; spacing
+    # marks (Mc) with a class of their own stay and become an underscore.
+    pool = "ae\u0301\u0316\u0327\u05b0\u0f71\U0001d165\u093e\u0903\ufdfa\uac00 -="
+    rng = random.Random(20261022)
+    for _ in range(5000):
+        text = "".join(rng.choice(pool) for _ in range(rng.randrange(0, 16)))
+        for upper in (True, False):
+            assert sanitize_env_name(text, upper=upper) == _whole_string_fold(text, upper), text

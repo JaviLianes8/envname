@@ -90,3 +90,85 @@ def test_runs_as_a_module() -> None:
     )
     assert result.returncode == 1
     assert "'-x': '-' is not allowed at index 0" in result.stderr
+
+
+def test_version_prints_the_package_version(capsys: pytest.CaptureFixture[str]) -> None:
+    from envname import __version__
+
+    with pytest.raises(SystemExit) as caught:
+        main(["--version"])
+    assert caught.value.code == 0
+    assert capsys.readouterr().out == f"envname {__version__}\n"
+
+
+@pytest.mark.parametrize(("command", "argument"), [("check", "NAME"), ("sanitize", "TEXT")])
+def test_a_missing_argument_is_a_usage_error(
+    command: str, argument: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as caught:
+        main([command])
+    assert caught.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"error: the following arguments are required: {argument}" in captured.err
+
+
+def test_keep_case_keeps_the_prefix_as_given(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["sanitize", "--keep-case", "--prefix", "app_", "db.host"]) == 0
+    assert capsys.readouterr().out == "app_db_host\n"
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["check", "--rules", "x" * 30_000, "A"],
+        ["x" * 30_000],
+        ["check", "--" + "x" * 30_000 + "=1", "A"],
+    ],
+)
+def test_usage_errors_stay_short(argv: list[str], capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as caught:
+        main(argv)
+    assert caught.value.code == 2
+    assert len(capsys.readouterr().err) < 1000
+
+
+def test_unknown_rules_name_the_choices(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit):
+        main(["check", "--rules", "posix", "A"])
+    assert capsys.readouterr().err.splitlines()[-1] == (
+        "envname check: error: argument --rules: invalid choice: 'posix' "
+        "(choose from 'shell', 'portable', 'environ')"
+    )
+
+
+class _ClosedPipe(io.StringIO):
+    def write(self, text: str) -> int:
+        raise BrokenPipeError(32, "Broken pipe")
+
+
+def test_sanitize_stops_quietly_when_the_reader_has_gone(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(sys, "stdout", _ClosedPipe())
+    assert main(["sanitize", "a", "b"]) == 141
+    assert capsys.readouterr().err == ""
+
+
+def test_a_closed_pipe_ends_the_process_without_a_traceback() -> None:
+    # The read end is closed before the child starts, so its first write must fail.
+    read, write = os.pipe()
+    os.close(read)
+    env = {**os.environ, "PYTHONPATH": str(SRC)}
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "envname", "sanitize", "db.host", "max conn"],
+            stdout=write,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+            env=env,
+        )
+    finally:
+        os.close(write)
+    assert (result.returncode, result.stderr) == (141, "")

@@ -10,11 +10,11 @@ from __future__ import annotations
 import itertools
 import json
 import os
-import shutil
 import subprocess
 import sys
 
 import pytest
+from conftest import find_bash
 
 from envname import is_valid_env_name
 
@@ -28,14 +28,6 @@ def _corpus() -> list[str]:
     return names
 
 
-def _bash() -> str | None:
-    found = shutil.which("bash")
-    # On Windows "bash" may be the WSL launcher in System32, which is not a shell here.
-    if found is None or "system32" in found.lower():
-        return None
-    return found
-
-
 def _bash_literal(name: str) -> str:
     # ANSI-C quoting spells every byte, so spaces, quotes and newlines reach bash intact
     # whatever the platform does to command lines.
@@ -43,7 +35,7 @@ def _bash_literal(name: str) -> str:
 
 
 def test_shell_rules_match_bash() -> None:
-    bash = _bash()
+    bash = find_bash()
     if bash is None:
         pytest.skip("bash is not installed")
     names = _corpus()
@@ -113,3 +105,33 @@ def test_environ_rules_match_the_operating_system() -> None:
         assert all(name.startswith("=") and "=" not in name[1:] for name in stricter)
     else:
         assert stricter == []
+
+
+PUTENV_PROBE = """
+import json, os, sys
+out = []
+for name in json.load(sys.stdin):
+    try:
+        os.putenv(name, "v")
+    except (ValueError, OSError):
+        out.append(False)
+    else:
+        out.append(True)
+print(json.dumps(out))
+"""
+
+
+def test_environ_rules_match_python_putenv() -> None:
+    # CPython refuses an empty name, "=" anywhere (Windows refuses a leading "=" too,
+    # through its C runtime) and NUL; the environ rule set says the same.
+    names = [*_corpus(), "A\x00B", "\x00", "=", "=="]
+    result = subprocess.run(
+        [sys.executable, "-I", "-c", PUTENV_PROBE],
+        input=json.dumps(names),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    verdicts = json.loads(result.stdout)
+    for name, accepted in zip(names, verdicts, strict=True):
+        assert is_valid_env_name(name, rules="environ") == accepted, repr(name)

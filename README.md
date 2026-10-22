@@ -1,6 +1,14 @@
 # envname
 
+[![Lianes8 Certified](https://lianes8studio.com/certified/lianes8-certified-badge.svg)](https://lianes8studio.com/certified)
+
 Validate and sanitize environment variable names against POSIX, shell and OS rules.
+
+A program that creates environment variables from user input, config keys or `.env`
+files has to decide which names are valid. The answer depends on who reads the name: a
+shell only expands `[A-Za-z_][A-Za-z0-9_]*`, the POSIX utilities use upper-case names
+only, and the operating system stores almost anything. `envname` names those three rule
+sets, tells you why a name fails and where, and turns arbitrary text into a safe name.
 
 ## Install
 
@@ -119,26 +127,54 @@ Things worth knowing:
 - `environ` checks the string, not its encoding. On POSIX, Python encodes names with
   `os.fsencode`, so a lone surrogate outside U+DC80 to U+DCFF passes the rule but
   cannot be set there; Windows accepts it.
-- Windows limits a variable to 32,767 characters, name and value together; Python
-  enforces that in `os.environ`. A name on its own cannot know its value, so no rule
-  limits length.
-- `.env` parsers are looser than shells: python-dotenv takes any unquoted key without `=`, `#`
-  or whitespace. Such keys load, but a shell cannot read them and Compose only
-  interpolates `$NAME` for `shell` names.
+- The Windows documentation gives 32,767 characters as the largest size of a variable.
+  Python's `os.putenv` on Windows refuses a `name=value` string longer than that, so
+  name and value together can hold 32,766 characters, while `SetEnvironmentVariableW`
+  itself stores longer names. A name on its own cannot know its value, so no rule limits
+  length.
+- `.env` parsers are looser than shells: python-dotenv takes any unquoted key without
+  `=`, `#` or whitespace. Such keys load, but a shell cannot read them, and Compose only
+  interpolates `$NAME` when the name matches `[_a-z][_a-z0-9]*` ignoring case, which for
+  ASCII names is exactly the `shell` rule set.
 
 ## Why
 
-Most projects re-check environment variable names with a one-off regex that quietly
-drifts: it forgets the leading-digit rule, lets a stray `=` through, accepts an empty
-string, or rejects real names like `ProgramFiles(x86)` that it should only refuse to
-create. `envname` names the three rule sets POSIX and the operating systems actually
-define, explains why a name fails, and turns arbitrary text into a safe name. It is
-typed, has no dependencies, and its rules are tested against a real `bash` and the
-real operating system call that stores variables.
+The usual shortcuts each answer a different question:
+
+- `str.isidentifier()` checks Python identifiers, so it accepts `été` and `ﬁle`, which no
+  shell in the C locale accepts as a name.
+- `string.Template` uses `(?a:[_a-z][_a-z0-9]*)` with `re.IGNORECASE` to find
+  placeholders in a template. It is the `shell` rule, but it finds names in text: it does
+  not validate one, explain a failure, or know the other two rule sets.
+- `os.environ` and `os.putenv` refuse only what the operating system refuses (an empty
+  name, `=`, NUL), so `my-var` is stored without complaint and no shell can read it back.
+- python-dotenv takes any unquoted key without `=`, `#` or whitespace.
+- A hand-written regular expression is easy to get subtly wrong: forgetting the
+  leading-digit rule, letting `=` through, accepting an empty string, or rejecting a real
+  name such as `ProgramFiles(x86)` that it should only refuse to create.
+
+`envname` is small, typed and has no dependencies. Its rules are tested against the
+POSIX and Bash texts themselves, a real `bash`, the real call that stores a variable on
+the operating system, Python's `os.putenv`, and the Unicode Character Database for the
+sanitizer.
+
+## Documentation
+
+The [guide](https://github.com/JaviLianes8/envname/blob/main/GUIDE.md) is the full
+reference: every function, its errors, the command line and the stability promise. The
+[changelog](https://github.com/JaviLianes8/envname/blob/main/CHANGELOG.md) lists what
+changed in each release.
+
+## Development
+
+`python scripts/fetch_upstream.py` downloads the specifications, the Unicode data and the
+upstream sources listed in `tests/upstream/MANIFEST.json` (they are not part of the
+repository; their tests skip without them). `scripts/check.ps1` runs format, lint, types
+and tests. Set `ENVNAME_E2E=1` to also build the wheel and test the installed package.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/JaviLianes8/envname/blob/main/LICENSE).
 
 ## Links
 

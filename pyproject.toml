@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "envname"
-version = "0.2.0"
+version = "1.0.0"
 description = "Validate and sanitize environment variable names against POSIX, shell and OS rules"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,7 +13,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Javier Lianes", email = "javier@lianes8studio.com" }]
 keywords = ["environment", "environment-variables", "env", "posix", "shell", "dotenv", "validation", "sanitize"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Environment :: Console",
     "Operating System :: OS Independent",
@@ -31,21 +31,22 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["ruff", "mypy", "pytest", "build", "twine"]
+dev = ["ruff", "mypy", "pytest", "pytest-timeout", "build", "twine"]
 
 [project.scripts]
 envname = "envname._cli:main"
 
 [project.urls]
 Homepage = "https://lianes8studio.com"
-Repository = "https://github.com/JaviLianes8/envname"
+Source = "https://github.com/JaviLianes8/envname"
 Issues = "https://github.com/JaviLianes8/envname/issues"
 Changelog = "https://github.com/JaviLianes8/envname/blob/main/CHANGELOG.md"
 LinkedIn = "https://www.linkedin.com/in/jlianes/"
 Funding = "https://buymeacoffee.com/jlianesglrs"
 
 [tool.hatch.build.targets.sdist]
-exclude = ["IMPROVEMENTS-round.md"]
+# Third-party files are fetched locally and never shipped; only their manifest is.
+exclude = ["IMPROVEMENTS-round*.md", "CERT-1.0-*.md", "tests/upstream/*", "!tests/upstream/MANIFEST.json"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/envname"]
@@ -62,6 +63,7 @@ python_version = "3.10"
 strict = true
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["src", "tests"]
 pythonpath = ["src"]
-addopts = "-q"
+addopts = "-q --doctest-modules"
+timeout = 300
