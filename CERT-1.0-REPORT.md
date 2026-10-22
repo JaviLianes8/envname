@@ -18,6 +18,7 @@ Progress:
 - [x] PR #3 and trace guard CLEAN
 - [x] QA lenses round 1: every finding fixed at 7b0ddad (none disputed)
 - [x] QA lenses round 2: every finding fixed at 9b27a1e (none disputed)
+- [x] QA lenses round 3: every finding fixed at b553ca7 (none disputed)
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer reports PASS (item 16)
 
@@ -246,7 +247,34 @@ Verification at 9b27a1e:
   file was not copied there); that file's tests, `test_spec_sources.py`, pass here, 8
   passed.
 
-Round 3 verdicts: pending.
+### Round 3 (reviewed 21c6ba2, fixed in b553ca7)
+
+Lenses (c) and (d) both re-verified N1 (no stdout) as fixed on every interpreter and found
+no regression of round 1 or 2; both reported the same new finding, its stderr twin. Fixed;
+none is disputed. It was first pinned by `tests/test_cli_streams.py`, which fails on
+21c6ba2: 9 of its 30 tests on CPython 3.13.2, 18 on 3.10.19.
+
+| Lens | Finding | Severity | Fix |
+| --- | --- | --- | --- |
+| c, d | N2: a process started without a stderr (`2>&-`, `pythonw`). `_warn` wrote to `sys.stderr` unguarded, so `main(["check", "1X"])` raised `AttributeError` instead of returning 1 (and `python -m envname` raised it instead of `SystemExit(1)`; the process exited 1 only because the exception was unhandled). On 3.10, argparse also wrote to the missing stream, so a usage error exited 1 instead of 2 and `--version` under `pythonw` exited 1 instead of 0 | low | `_warn` returns at once without a stderr. `_Parser._print_message` skips a missing stream and a write `OSError`, as argparse does from 3.11. Fixing it showed a further wart on every version: without a stderr, argparse prints the usage line of an error on stdout instead (where `sanitize` prints names), so `_Parser.error` now exits 2 at once when there is no stderr. Tests, each over 7 command lines (valid and invalid `check`, bad `--prefix`, unknown `--rules`, missing `TEXT`, `--version`, `sanitize`): in-process with `sys.stderr = None` (exit status and the exact stdout), with both streams None, a child started by `bash` with `2>&-` (exact stdout and status), and a child started by `pythonw` with no standard handles; plus `runpy` as `__main__` exits 1, and a stderr raising `ENOSPC` still gives exit 2. GUIDE and CHANGELOG say so |
+
+Verification at b553ca7:
+
+- This PC: `ruff format --check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests`
+  and `pytest` exit 0.
+- This PC, wheel built from a clean clone (`twine check --strict` passed) and installed in a
+  fresh venv per interpreter, the sdist's suite with Git's `bash`: CPython 3.10.19, 3.11.5,
+  3.12.12, 3.13.2, 3.14.2 and 3.14.2 free-threaded each 288 passed, 4 skipped (the opt-in
+  wheel e2e and one fetched file not copied).
+- Another machine, CPython 3.14, clean clone with the fetched sources, Git's `bash`,
+  python-dotenv and `ENVNAME_E2E=1`: `pytest` exits 0, 291 passed, 1 skipped (one fetched
+  file was not copied there).
+
+### Disputed findings
+
+None in round 3.
+
+Round 4 verdicts: pending.
 
 ## Independent review (item 16)
 
