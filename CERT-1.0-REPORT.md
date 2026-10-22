@@ -19,8 +19,9 @@ Progress:
 - [x] QA lenses round 1: every finding fixed at 7b0ddad (none disputed)
 - [x] QA lenses round 2: every finding fixed at 9b27a1e (none disputed)
 - [x] QA lenses round 3: every finding fixed at b553ca7 (none disputed)
-- [ ] Five QA lenses report PASS (item 19)
-- [ ] Independent reviewer reports PASS (item 16)
+- [x] QA lenses round 4: every finding fixed at 0a50825 (none disputed)
+- [x] Five QA lenses report PASS (item 19)
+- [x] Independent reviewer reports PASS (item 16)
 
 ## Scorecard
 
@@ -41,10 +42,10 @@ Progress:
 | 13 | pyproject 1.0.0, Production/Stable | PASS |
 | 14 | sdist and wheel contents | PASS |
 | 15 | Gates each exit 0 | PASS: see Gates |
-| 16 | Independent reviewer | pending |
-| 17 | PR and trace guard | PR #3 from `release/1.0.0`, trace guard CLEAN; merge and publish left to the maintainer |
+| 16 | Independent reviewer | PASS: round 1 at 32b71c1, every item scored PASS (see Independent review) |
+| 17 | PR and trace guard | PASS: PR #3 from `release/1.0.0`, trace guard CLEAN; merge and publish left to the maintainer |
 | 18 | Contracts bite (mutations) | PASS: author round 32 mutants, 32 killed after two contracts were added |
-| 19 | Five independent QA lenses | pending |
+| 19 | Five independent QA lenses | PASS: all five lenses report PASS (see QA lenses) |
 
 ## Baseline on 0.2.0 (before any change)
 
@@ -307,12 +308,70 @@ Verification of the fix:
   `ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest` exit 0; 306
   passed, none skipped.
 
+### Round 5 (reviewed 32b71c1)
+
+Lenses (c) and (d) re-verified the round 4 fix at 32b71c1: lens (c) re-ran N2, N3 and N4
+in process, under `2>&-`, with a closed pipe and under `pythonw` on CPython 3.11.5 and
+3.13.2, re-checked F1 to F6 and N1 for regressions, and swept the changed code with 28
+probes, including 3,000 seeded command lines with injected write and flush errors on both
+streams; lens (d) installed the wheel and the sdist in fresh venvs on another machine and
+ran its consumer, probes and broken-pipe checks on CPython 3.10 to 3.14 and 3.14
+free-threaded, plus the suite on every interpreter. Neither reported a finding.
+
 ### Disputed findings
 
-None in rounds 3 and 4.
+None in rounds 3, 4 and 5.
 
-Round 5 verdicts: pending.
+### Final verdicts
+
+Report paths are relative to the local certification work folder, which is not in the
+repository.
+
+| Lens | Rounds | Final verdict | Report | Commit |
+| --- | --- | --- | --- | --- |
+| a. API and docs | 3 | PASS | `envname-cert/lens-a-r3/sweep-313.out` | 21c6ba2 |
+| b. Correctness and ground truth | 2 | PASS | `envname-cert/lens-b-r2/REPORT.md` | 5b635dd |
+| c. Adversarial and robustness | 5 | PASS | `envname-cert/lens-c-r5/REPORT.md` | 32b71c1 |
+| d. Packaging and real e2e | 5 | PASS | `envname-cert/lens-d-r5/job-ABC.log` | 32b71c1 |
+| e. Contract strength | 3 | PASS | `envname-cert/lens-e-r3/results.json` | 21c6ba2 |
+
+Lenses (a), (b) and (e) passed at the commit shown; the code changed after them only in
+`_cli.py`, for the stream handling that lenses (c) and (d) re-verified at 32b71c1. Lens
+(e)'s round 3 re-applied every mutant it had reported (N10, N11, N14 to N16, N18, N22,
+N33, N36, N39) and 30 new ones (S01 to S30): all 40 killed.
 
 ## Independent review (item 16)
 
-Pending.
+Round 1, a fresh reviewer at 32b71c1, scored every item of the certification list against
+its own runs: a full suite with the fetched sources, Git's `bash`, python-dotenv and
+`ENVNAME_E2E=1`; the sdist and wheel built and checked with `twine check --strict`; the
+wheel installed in a fresh venv and driven as an external consumer (README examples, API,
+CLI by subprocess, clean uninstall); the sdist's suite against the installed wheel on
+CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2 free-threaded (303 passed, 3
+skipped each: the three opt-in wheel e2e tests, which the full suite runs); and its own
+mutation round of 14 mutants (six of the author's list re-applied and eight new ones in
+the command line, the rules and the sanitizer), all killed.
+
+| # | Item | Verdict |
+| --- | --- | --- |
+| 1 | Public API reviewed for stability | PASS |
+| 2 | `__all__` exact, no private imports in docs | PASS |
+| 3 | Docstrings with runnable examples, doctests | PASS |
+| 4 | Typed end to end | PASS |
+| 5 | Typed, documented, bounded errors | PASS |
+| 6 | Contract tests of every public name | PASS |
+| 7 | Real ground truth | PASS |
+| 8 | Real e2e from the wheel | PASS |
+| 9 | Seeded fuzz, no crash, hang or blowup | PASS |
+| 10 | Supported Pythons | PASS |
+| 11 | README and `twine check` | PASS |
+| 12 | Dated CHANGELOG section | PASS |
+| 13 | pyproject 1.0.0, Production/Stable | PASS |
+| 14 | sdist and wheel contents | PASS |
+| 15 | Gates each exit 0 | PASS |
+| 16 | Independent reviewer | PASS |
+| 17 | PR and trace guard | PASS: PR #3 from `release/1.0.0`, trace guard CLEAN; merge and publish left to the maintainer |
+| 18 | Contracts bite (mutations) | PASS |
+| 19 | Five independent QA lenses | PASS |
+
+No finding; nothing to fix or re-review.
