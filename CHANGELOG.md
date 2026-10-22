@@ -38,6 +38,12 @@ attributes, and the command line with its exit codes.
   `AttributeError` from `main()` (the process still exited 1, with the traceback
   lost), and a usage error printed its usage line on stdout instead, and on
   Python 3.10 exited 1 instead of 2.
+- When the reader of stderr or stdout goes away, the command line keeps its exit
+  status: `envname check` stops reporting and exits 1 (or 0), a usage error exits 2,
+  and `--help` and `--version` exit 0. In 0.2.0 `check` with an invalid name and a
+  usage error exited 120, and `--help` exited 120 after printing `Exception ignored
+  ... OSError` on stderr. Any other write error on stderr during `check`, such as a
+  full disk, still propagates.
 - Command line usage errors quote at most 300 characters of the offending argument,
   and an unknown `--rules` value at most 60. In 0.2.0 argparse repeated it in full.
 - The public objects report `envname` as their module, so a pickled `InvalidEnvName`

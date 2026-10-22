@@ -188,6 +188,11 @@ envname --version
   quoted like a name in an error: at most 60 characters, never past its first `=`.
 - Started without a stderr (`2>&-`, `pythonw`), every command keeps the exit status
   above and prints no message, not even a usage line on stdout.
+- When the reader of stderr goes away (`2>&1 | head -c 0`), `check` stops reporting,
+  still checks every name and exits 1 or 0, and a usage error still exits 2. When the
+  reader of stdout goes away, `--help` and `--version` still exit 0. The message is lost,
+  not the status; any other write error on stderr during `check`, such as a full disk, is
+  not hidden.
 - Put `--` before a name that starts with `-`.
 
 ## Stability

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import contextlib
 import errno
 import os
 import sys
@@ -36,8 +35,12 @@ class _Parser(argparse.ArgumentParser):
         # AttributeError, turning exit 2 or 0 into 1; 3.11+ skips the write, as here.
         file = file or sys.stderr
         if message and file is not None:
-            with contextlib.suppress(OSError):
+            try:
                 file.write(message)
+                _flush(file)
+            except OSError:
+                # The message is lost, not the status (2 for a usage error, 0 for --help).
+                _to_null(file)
 
 
 def _rules(value: str) -> str:
@@ -68,15 +71,50 @@ def _parser() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
     return parser, sanitize
 
 
-def _warn(message: str) -> None:
+def _flush(stream: object) -> None:
+    flush = getattr(stream, "flush", None)
+    if flush is not None:
+        flush()
+
+
+def _reader_gone(exc: OSError) -> bool:
+    # Windows reports a pipe whose reader has gone (`| head -1`) as EINVAL.
+    windows = sys.platform == "win32"
+    return isinstance(exc, BrokenPipeError) or (windows and exc.errno == errno.EINVAL)
+
+
+def _to_null(stream: object) -> None:
+    # The unwritten text stays buffered; on the null device the flush at exit cannot fail
+    # again and turn the exit status into 120.
+    try:
+        target = stream.fileno()  # type: ignore[attr-defined]
+    except (AttributeError, OSError, ValueError):
+        return
+    null = os.open(os.devnull, os.O_WRONLY)
+    try:
+        os.dup2(null, target)
+    finally:
+        os.close(null)
+
+
+def _warn(message: str) -> bool:
+    """Write one line on stderr; return False once nobody can read it."""
     # A name can hold characters the console encoding cannot show (cp1252 on Windows);
     # escaping them beats crashing halfway through the report.
     stream = sys.stderr
     if stream is None:
         # Started without a stderr (pythonw, `2>&-`): the exit status still reports it.
-        return
+        return False
     encoding = getattr(stream, "encoding", None) or "utf-8"
-    stream.write(message.encode(encoding, "backslashreplace").decode(encoding) + "\n")
+    try:
+        stream.write(message.encode(encoding, "backslashreplace").decode(encoding) + "\n")
+        stream.flush()
+    except OSError as exc:
+        if not _reader_gone(exc):
+            raise
+        _to_null(stream)
+        return False
+    return True
 
 
 def _print_lines(lines: list[str]) -> int:
@@ -88,19 +126,9 @@ def _print_lines(lines: list[str]) -> int:
             print(line)
         sys.stdout.flush()
     except OSError as exc:
-        # Windows reports a pipe whose reader has gone (`| head -1`) as EINVAL.
-        windows = sys.platform == "win32"
-        gone = isinstance(exc, BrokenPipeError) or (windows and exc.errno == errno.EINVAL)
-        if not gone:
+        if not _reader_gone(exc):
             raise
-        # Point stdout at the null device so the flush at exit cannot fail again.
-        try:
-            target = sys.stdout.fileno()
-        except (AttributeError, OSError, ValueError):
-            return READER_GONE
-        null = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(null, target)
-        os.close(null)
+        _to_null(sys.stdout)
         return READER_GONE
     return 0
 
@@ -111,12 +139,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "check":
         failed = False
+        report = True
         for name in args.names:
             try:
                 check_env_name(name, rules=args.rules)
             except InvalidEnvName as exc:
-                _warn(f"envname: {exc}")
                 failed = True
+                if report:
+                    report = _warn(f"envname: {exc}")
         return 1 if failed else 0
     upper = not args.keep_case
     try:
